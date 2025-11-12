@@ -4,98 +4,15 @@
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="description" content="Threads 精選貼文展示頁面" />
+	<meta name="author" content="YZIANGLOVE" />
 	<title>Threads 精選貼文</title>
+	
+	<!-- Google Fonts -->
 	<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&display=swap" rel="stylesheet">
-	<style>
-		:root {
-			--bg: #f6f8ff;
-			--card: #ffffff;
-			--muted: #65738a
-		}
-
-		* {
-			box-sizing: border-box
-		}
-
-		html,
-		body {
-			height: 100%
-		}
-
-		body {
-			font-family: 'Noto Sans TC', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-			margin: 0;
-			background: linear-gradient(180deg, #f8fbff, #ffffff);
-			color: #0f1724;
-			-webkit-font-smoothing: antialiased;
-			-moz-osx-font-smoothing: grayscale;
-			padding: 36px;
-		}
-
-		.container {
-			max-width: 980px;
-			margin: 0 auto
-		}
-
-		.header {
-			display: flex;
-			align-items: baseline;
-			justify-content: space-between;
-			gap: 12px;
-			margin-bottom: 18px
-		}
-
-		.title {
-			margin: 0;
-			font-size: 1.4rem;
-			font-weight: 700
-		}
-
-		.subtitle {
-			margin: 0;
-			color: var(--muted);
-			font-size: 0.95rem
-		}
-
-		.grid {
-			display: grid;
-			grid-template-columns: 1fr;
-			gap: 16px
-		}
-
-		.card {
-			background: var(--card);
-			border-radius: 14px;
-			box-shadow: 0 8px 30px rgba(16, 24, 40, 0.06);
-			padding: 12px;
-			border: 1px solid rgba(16, 24, 40, 0.04);
-			overflow: hidden
-		}
-
-		.embed-wrap {
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			padding: 8px
-		}
-
-		footer {
-			margin-top: 20px;
-			text-align: center;
-			color: var(--muted);
-			font-size: 0.9rem
-		}
-
-		@media(min-width:720px) {
-			.grid {
-				grid-template-columns: 1fr 1fr
-			}
-		}
-
-		a {
-			color: inherit
-		}
-	</style>
+	
+	<!-- 外部 CSS 樣式表 (樣式層) -->
+	<link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
@@ -581,8 +498,13 @@
 			</div> 
 			 rel="noopener noreferrer"-->
 		</div>
-		<script async src="https://www.threads.com/embed.js"></script>
 	</div>
+	
+	<!-- Threads 嵌入腳本 -->
+	<script async src="https://www.threads.com/embed.js"></script>
+	
+	<!-- 外部 JavaScript 檔案 (互動層) -->
+	<script src="script.js"></script>
 </body>
 
 </html>

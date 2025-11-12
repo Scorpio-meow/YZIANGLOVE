@@ -1,0 +1,155 @@
+/* CSS 變數定義 */
+:root {
+	--bg: #f6f8ff;
+	--card: #ffffff;
+	--muted: #65738a;
+	--primary-color: #0f1724;
+	--border-color: rgba(16, 24, 40, 0.04);
+	--shadow: 0 8px 30px rgba(16, 24, 40, 0.06);
+}
+
+/* 基礎樣式重置 */
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+/* 主體樣式 */
+body {
+	font-family: 'Noto Sans TC', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+	margin: 0;
+	background: linear-gradient(180deg, #f8fbff, #ffffff);
+	color: var(--primary-color);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	padding: 36px;
+}
+
+/* 容器樣式 */
+.container {
+	max-width: 980px;
+	margin: 0 auto;
+}
+
+/* 標題區域 */
+.header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 18px;
+}
+
+.title {
+	margin: 0;
+	font-size: 1.4rem;
+	font-weight: 700;
+}
+
+.subtitle {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.95rem;
+}
+
+/* 網格佈局 */
+.grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 16px;
+}
+
+/* 卡片樣式 */
+.card {
+	background: var(--card);
+	border-radius: 14px;
+	box-shadow: var(--shadow);
+	padding: 12px;
+	border: 1px solid var(--border-color);
+	overflow: hidden;
+	transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+	transform: translateY(-4px);
+	box-shadow: 0 12px 40px rgba(16, 24, 40, 0.1);
+}
+
+/* 嵌入內容容器 */
+.embed-wrap {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 8px;
+}
+
+/* 頁尾樣式 */
+footer {
+	margin-top: 20px;
+	text-align: center;
+	color: var(--muted);
+	font-size: 0.9rem;
+}
+
+/* 連結樣式 */
+a {
+	color: inherit;
+	text-decoration: none;
+	transition: opacity 0.2s ease;
+}
+
+a:hover {
+	opacity: 0.8;
+}
+
+/* 響應式設計 - 平板及以上裝置 */
+@media (min-width: 720px) {
+	.grid {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+/* 響應式設計 - 桌機裝置 */
+@media (min-width: 1024px) {
+	body {
+		padding: 48px;
+	}
+
+	.title {
+		font-size: 1.6rem;
+	}
+
+	.grid {
+		gap: 20px;
+	}
+}
+
+/* 載入動畫 */
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.card {
+	animation: fadeIn 0.5s ease-out;
+}
+
+/* 為不同卡片添加延遲動畫效果 */
+.card:nth-child(1) { animation-delay: 0.05s; }
+.card:nth-child(2) { animation-delay: 0.1s; }
+.card:nth-child(3) { animation-delay: 0.15s; }
+.card:nth-child(4) { animation-delay: 0.2s; }
+.card:nth-child(5) { animation-delay: 0.25s; }
+.card:nth-child(6) { animation-delay: 0.3s; }
+.card:nth-child(7) { animation-delay: 0.35s; }
+.card:nth-child(8) { animation-delay: 0.4s; }
