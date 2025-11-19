@@ -1,194 +1,232 @@
-/**
- * Threads 精選貼文 - JavaScript 互動層
- * 功能：處理頁面互動、動態效果、使用者體驗優化
- */
+(function appScope(global) {
+    'use strict';
 
-// 等待 DOM 完全載入
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('頁面已載入完成！');
-    
-    // 初始化所有功能
-    initScrollAnimation();
-    initCardInteractions();
-    initThemeToggle();
-    initBackToTop();
-    
-    // 載入 Threads 嵌入腳本
-    loadThreadsEmbed();
-});
+    const App = {};
 
-/**
- * 滾動動畫效果
- */
-function initScrollAnimation() {
-    const cards = document.querySelectorAll('.card');
-    
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
+    // 通用工具
+    const scheduleMicrotask = typeof queueMicrotask === 'function' ? queueMicrotask : cb => Promise.resolve().then(cb);
+
+    function throttle(fn, wait = 100) {
+        let last = 0;
+        let timeout;
+        return function(...args) {
+            const now = Date.now();
+            const remaining = wait - (now - last);
+            if (remaining <= 0) {
+                if (timeout) { clearTimeout(timeout); timeout = null; }
+                last = now;
+                fn.apply(this, args);
+            } else if (!timeout) {
+                timeout = setTimeout(() => {
+                    last = Date.now();
+                    timeout = null;
+                    fn.apply(this, args);
+                }, remaining);
             }
-        });
-    }, {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-    });
-    
-    cards.forEach(card => {
-        observer.observe(card);
-    });
-}
+        };
+    }
 
-/**
- * 卡片互動效果
- */
-function initCardInteractions() {
-    const cards = document.querySelectorAll('.card');
-    
-    cards.forEach(card => {
-        // 卡片的 hover 效果由 CSS 處理 (.card:hover)，無需在 JS 中使用 inline styles
-        
-        // 點擊效果
-        card.addEventListener('click', function(e) {
-            // 如果點擊的不是連結，則添加脈衝效果
-            if (!e.target.closest('a')) {
-                this.classList.add('pulse');
-                setTimeout(() => {
-                    this.classList.remove('pulse');
-                }, 300);
+    function debounce(fn, wait = 100) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => fn.apply(this, args), wait);
+        };
+    }
+
+    // 主題切換
+    (function(){
+        const THEME_KEY = 'theme';
+        App.getTheme = () => {
+            const stored = localStorage.getItem(THEME_KEY);
+            if (stored) return stored;
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+            return 'light';
+        };
+        App.setTheme = (t) => {
+            document.body.setAttribute('data-theme', t);
+            localStorage.setItem(THEME_KEY, t);
+        };
+
+        App.toggleTheme = () => {
+            const current = App.getTheme();
+            App.setTheme(current === 'dark' ? 'light' : 'dark');
+            renderThemeToggle();
+        };
+
+        function renderThemeToggle() {
+            let btn = document.querySelector('.theme-toggle');
+            if (!btn) return;
+            const t = App.getTheme();
+            btn.setAttribute('aria-pressed', t === 'dark');
+            btn.title = t === 'dark' ? '切換到淺色模式' : '切換到深色模式';
+        }
+
+        // lazy-create UI if missing
+        App.ensureThemeToggle = function() {
+            if (document.querySelector('.theme-toggle')) return;
+            const btn = document.createElement('button');
+            btn.className = 'theme-toggle';
+            btn.setAttribute('aria-label', '切換主題');
+            btn.setAttribute('aria-pressed', App.getTheme() === 'dark');
+            btn.innerHTML = '☾';
+            btn.addEventListener('click', App.toggleTheme);
+            // 放在 header 右上角（若有 header），否則放到 body
+            const header = document.querySelector('.header');
+            (header || document.body).appendChild(btn);
+            scheduleMicrotask(renderThemeToggle);
+        };
+    })();
+
+    // 回到頂端
+    (function(){
+        App.initBackToTop = function () {
+            let btn = document.querySelector('.back-to-top');
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.className = 'back-to-top';
+                btn.setAttribute('aria-label', '返回頂部');
+                btn.innerHTML = '↑';
+                document.body.appendChild(btn);
             }
+            const onScroll = throttle(() => {
+                if (window.pageYOffset > 300) btn.classList.add('visible'); else btn.classList.remove('visible');
+            }, 80);
+            window.addEventListener('scroll', onScroll, { passive: true });
+            btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+        };
+    })();
+
+    // 卡片顯示 + 互動: 使用事件代理，減少事件數量
+    App.initCardInteractions = function() {
+        const grid = document.querySelector('.grid');
+        if (!grid) return;
+        grid.addEventListener('click', function(e) {
+            const card = e.target.closest('.card');
+            if (!card) return;
+            // ignore link clicks
+            if (e.target.closest('a')) return;
+            card.classList.add('pulse');
+            setTimeout(() => card.classList.remove('pulse'), 300);
         });
-    });
-}
+    };
 
-/**
- * 主題切換功能（淺色/深色模式）
- */
-function initThemeToggle() {
-    // 檢查是否有儲存的主題偏好
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.body.setAttribute('data-theme', savedTheme);
-    
-    // 創建主題切換按鈕（如果需要的話）
-    // 這裡可以添加主題切換按鈕的邏輯
-}
+    // 滾動顯示動畫（IntersectionObserver）
+    App.initScrollAnimation = function() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    // 如果希望只在第一次顯示取消觀察，可取代下面註解
+                    // observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.12, rootMargin: '0px 0px -48px 0px' });
 
-/**
- * 返回頂部按鈕
- */
-function initBackToTop() {
-    // 創建返回頂部按鈕
-    const backToTopBtn = document.createElement('button');
-    backToTopBtn.innerHTML = '↑';
-    backToTopBtn.className = 'back-to-top';
-    backToTopBtn.setAttribute('aria-label', '返回頂部');
-    // 樣式已移到 css（.back-to-top），此處只維持 class
-    
-    document.body.appendChild(backToTopBtn);
-    
-    // 滾動顯示/隱藏按鈕
-    window.addEventListener('scroll', () => {
-        if (window.pageYOffset > 300) {
-            backToTopBtn.classList.add('visible');
-        } else {
-            backToTopBtn.classList.remove('visible');
+        document.querySelectorAll('.card').forEach(card => observer.observe(card));
+    };
+
+    // Video autoplay tracking (Shadow DOM aware)
+    (function(){
+        const pendingVideoRoots = new Set();
+        const trackedVideoRoots = new Set();
+        const videoRootObservers = new Map();
+        let videoAutoplayReady = false;
+
+        function trackVideoRoot(root) {
+            if (!root || trackedVideoRoots.has(root) || typeof root.querySelectorAll !== 'function') return;
+            trackedVideoRoots.add(root);
+            scanVideosInRoot(root);
+            const observer = new MutationObserver(debounce(() => scanVideosInRoot(root), 100));
+            observer.observe(root, { childList: true, subtree: true });
+            videoRootObservers.set(root, observer);
         }
-    });
-    
-    // 點擊返回頂部
-    backToTopBtn.addEventListener('click', () => {
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
-    });
-    
-    // 懸停效果由 CSS :hover 處理（.back-to-top:hover）
-}
 
-/**
- * 載入 Threads 嵌入腳本
- */
-function loadThreadsEmbed() {
-    // 檢查腳本是否已經載入
-    if (!document.querySelector('script[src="https://www.threads.com/embed.js"]')) {
-        const script = document.createElement('script');
-        script.src = 'https://www.threads.com/embed.js';
-        script.async = true;
-        document.body.appendChild(script);
-    }
-}
+        function scanVideosInRoot(root) {
+            if (!root || typeof root.querySelectorAll !== 'function') return;
+            const videos = root.querySelectorAll('video');
+            videos.forEach(setupVideo);
+        }
 
-/**
- * 卡片載入計數器
- */
-function countLoadedCards() {
-    const cards = document.querySelectorAll('.card');
-    console.log(`總共載入了 ${cards.length} 張卡片`);
-    return cards.length;
-}
+        function tryPlayVideo(video) {
+            if (!video) return;
+            const promise = video.play();
+            if (promise && typeof promise.then === 'function') {
+                promise.catch(() => {});
+            }
+        }
 
-/**
- * 效能監控
- */
-function logPerformance() {
-    if (window.performance) {
-        const perfData = window.performance.timing;
-        const pageLoadTime = perfData.loadEventEnd - perfData.navigationStart;
-        console.log(`頁面載入時間: ${pageLoadTime}ms`);
-    }
-}
+        function setupVideo(video) {
+            if (typeof HTMLVideoElement !== 'undefined' && !(video instanceof HTMLVideoElement)) return;
+            if (video.dataset.autoplaySetup) return;
+            video.dataset.autoplaySetup = 'true';
+            video.muted = true; video.defaultMuted = true; video.autoplay = true; video.playsInline = true; video.loop = true;
+            ['pointerdown','touchstart','click'].forEach(evt => video.addEventListener(evt, () => tryPlayVideo(video), { once: true }));
+            if (video.readyState >= 2) tryPlayVideo(video); else video.addEventListener('loadeddata', () => tryPlayVideo(video), { once: true });
+        }
 
-// 頁面載入完成後記錄效能
-window.addEventListener('load', () => {
-    setTimeout(() => {
-        logPerformance();
-        countLoadedCards();
-    }, 100);
-});
+        // Hook Shadow DOM attach
+        if (typeof Element !== 'undefined' && Element.prototype.attachShadow) {
+            const original = Element.prototype.attachShadow;
+            Element.prototype.attachShadow = function(init) {
+                const sr = original.call(this, init);
+                const isOpen = !init || init.mode === 'open';
+                if (isOpen) scheduleMicrotask(() => videoAutoplayReady ? trackVideoRoot(sr) : pendingVideoRoots.add(sr));
+                return sr;
+            };
+        }
 
-/**
- * 工具函數：節流
- */
-function throttle(func, delay) {
-    let timeoutId;
-    let lastExecTime = 0;
-    
-    return function(...args) {
-        const currentTime = Date.now();
-        
-        if (currentTime - lastExecTime < delay) {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => {
-                lastExecTime = currentTime;
-                func.apply(this, args);
-            }, delay);
+        App.initVideoAutoplay = function() {
+            if (videoAutoplayReady) return;
+            videoAutoplayReady = true;
+            trackVideoRoot(document);
+            if (pendingVideoRoots.size) { pendingVideoRoots.forEach(r => trackVideoRoot(r)); pendingVideoRoots.clear(); }
+            setInterval(() => trackedVideoRoots.forEach(scanVideosInRoot), 2_000);
+        };
+    })();
+
+    // 載入 Threads embed script
+    App.loadThreadsEmbed = function() {
+        const selector = 'script[src="https://www.threads.com/embed.js"]';
+        if (!document.querySelector(selector)) {
+            const tag = document.createElement('script');
+            tag.src = 'https://www.threads.com/embed.js';
+            tag.async = true;
+            tag.onload = () => setTimeout(App.initVideoAutoplay, 800);
+            document.body.appendChild(tag);
         } else {
-            lastExecTime = currentTime;
-            func.apply(this, args);
+            App.initVideoAutoplay();
         }
     };
-}
 
-/**
- * 工具函數：防抖
- */
-function debounce(func, delay) {
-    let timeoutId;
-    
-    return function(...args) {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-            func.apply(this, args);
-        }, delay);
+    // 效能/統計
+    App.countLoadedCards = function() {
+        const count = document.querySelectorAll('.card').length;
+        console.log('載入卡片數：', count);
+        return count;
     };
-}
 
-// 匯出函數供其他模組使用（如果需要）
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        throttle,
-        debounce,
-        countLoadedCards
+    App.logPerformance = function() {
+        if (!window.performance || !window.performance.timing) return;
+        const p = window.performance.timing; const t = p.loadEventEnd - p.navigationStart; console.log('頁面載入時間:', t, 'ms');
     };
-}
+
+    // 初始化入口
+    document.addEventListener('DOMContentLoaded', function() {
+        App.setTheme(App.getTheme());
+        App.ensureThemeToggle();
+        App.initBackToTop();
+        App.initCardInteractions();
+        App.initScrollAnimation();
+        App.loadThreadsEmbed();
+    });
+
+    // Window load hooks
+    window.addEventListener('load', () => {
+        setTimeout(() => { App.logPerformance(); App.countLoadedCards(); }, 120);
+    });
+
+    // Export functions for testing if needed
+    if (typeof module !== 'undefined' && module.exports) { module.exports = App; }
+    global.App = App;
+})(this);
