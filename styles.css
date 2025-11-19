@@ -1,11 +1,13 @@
-/* CSS 變數定義 */
+/* CSS 變數定義 - Craft.do 風格 */
 :root {
-	--bg: #f6f8ff;
-	--card: #ffffff;
-	--muted: #65738a;
-	--primary-color: #0f1724;
-	--border-color: rgba(16, 24, 40, 0.04);
-	--shadow: 0 8px 30px rgba(16, 24, 40, 0.06);
+	--bg: #F5F5F7;
+	--card: #FFFFFF;
+	--muted: #86868B;
+	--primary-color: #1D1D1F;
+	--border-color: rgba(0, 0, 0, 0.06);
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+	--shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
+	--radius: 16px;
 }
 
 /* 基礎樣式重置 */
@@ -20,63 +22,108 @@ body {
 
 /* 主體樣式 */
 body {
-	font-family: 'Noto Sans TC', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+	font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
 	margin: 0;
-	background: linear-gradient(180deg, #f8fbff, #ffffff);
+	background: var(--bg);
 	color: var(--primary-color);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
-	padding: 36px;
+	padding: 40px 20px;
+	line-height: 1.6;
 }
 
 /* 容器樣式 */
 .container {
-	max-width: 980px;
+	max-width: 1000px;
 	margin: 0 auto;
 }
 
 /* 標題區域 */
 .header {
 	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 12px;
-	margin-bottom: 18px;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	margin-bottom: 48px;
+	text-align: center;
 }
 
 .title {
 	margin: 0;
-	font-size: 1.4rem;
+	font-size: 2.5rem;
 	font-weight: 700;
+	letter-spacing: -0.02em;
+	color: var(--primary-color);
 }
 
 .subtitle {
 	margin: 0;
 	color: var(--muted);
+	font-size: 1.1rem;
+	font-weight: 400;
+}
+
+/* 導航選單 */
+.nav-menu {
+	display: flex;
+	gap: 12px;
+	margin-top: 8px;
+}
+
+.nav-link {
+	padding: 8px 20px;
+	border-radius: 24px;
+	background: transparent;
+	color: var(--muted);
+	text-decoration: none;
 	font-size: 0.95rem;
+	font-weight: 500;
+	transition: all 0.3s ease;
+	border: 1px solid var(--border-color);
+}
+
+.nav-link:hover {
+	background: var(--card);
+	color: var(--primary-color);
+	border-color: rgba(0, 0, 0, 0.12);
+	transform: translateY(-2px);
+	box-shadow: var(--shadow-sm);
+}
+
+.nav-link.active {
+	background: var(--primary-color);
+	color: white;
+	border-color: var(--primary-color);
+}
+
+.nav-link.active:hover {
+	opacity: 0.9;
+	transform: translateY(-2px);
 }
 
 /* 網格佈局 */
 .grid {
 	display: grid;
 	grid-template-columns: 1fr;
-	gap: 16px;
+	gap: 24px;
 }
 
 /* 卡片樣式 */
 .card {
 	background: var(--card);
-	border-radius: 14px;
-	box-shadow: var(--shadow);
-	padding: 12px;
+	border-radius: var(--radius);
+	box-shadow: var(--shadow-sm);
+	padding: 20px;
 	border: 1px solid var(--border-color);
-	overflow: hidden;
-	transition: transform 0.3s ease, box-shadow 0.3s ease;
+	overflow: visible;
+	transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .card:hover {
 	transform: translateY(-4px);
-	box-shadow: 0 12px 40px rgba(16, 24, 40, 0.1);
+	box-shadow: var(--shadow-hover);
+	border-color: rgba(0, 0, 0, 0.1);
 }
 
 /* 嵌入內容容器 */
@@ -84,7 +131,7 @@ body {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 8px;
+	padding: 0;
 }
 
 /* 頁尾樣式 */
@@ -109,22 +156,23 @@ a:hover {
 /* 響應式設計 - 平板及以上裝置 */
 @media (min-width: 720px) {
 	.grid {
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: repeat(2, 1fr);
 	}
 }
 
 /* 響應式設計 - 桌機裝置 */
 @media (min-width: 1024px) {
 	body {
-		padding: 48px;
+		padding: 60px 40px;
 	}
 
 	.title {
-		font-size: 1.6rem;
+		font-size: 3rem;
 	}
 
 	.grid {
-		gap: 20px;
+		gap: 32px;
+		grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
 	}
 }
 
@@ -153,3 +201,96 @@ a:hover {
 .card:nth-child(6) { animation-delay: 0.3s; }
 .card:nth-child(7) { animation-delay: 0.35s; }
 .card:nth-child(8) { animation-delay: 0.4s; }
+
+/* Threads Embed Overrides */
+.text-post-media {
+	background: #FFF !important;
+	border: 1px solid rgba(0, 0, 0, 0.15) !important;
+	border-radius: 12px !important;
+	max-width: 100% !important;
+	margin: 0 auto !important;
+	min-width: 270px !important;
+	padding: 0 !important;
+	width: 100% !important;
+	box-sizing: border-box !important;
+}
+
+.threads-embed-link {
+	background: #FFFFFF !important;
+	line-height: 0 !important;
+	padding: 0 !important;
+	text-align: center !important;
+	text-decoration: none !important;
+	width: 100% !important;
+	font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
+	display: block !important;
+}
+
+.threads-embed-content {
+	padding: 40px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.threads-embed-icon {
+	display: block;
+	height: 32px;
+	width: 32px;
+	padding-bottom: 20px;
+}
+
+.threads-embed-text {
+	font-size: 15px;
+	line-height: 21px;
+	color: #000000;
+	font-weight: 600;
+}
+
+/* 返回頂部按鈕樣式 */
+.back-to-top {
+	position: fixed;
+	bottom: 30px;
+	right: 30px;
+	width: 50px;
+	height: 50px;
+	border-radius: 50%;
+	background: var(--primary-color);
+	color: white;
+	border: none;
+	font-size: 24px;
+	cursor: pointer;
+	opacity: 0;
+	visibility: hidden;
+	transition: all 0.28s ease;
+	z-index: 1000;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.back-to-top.visible {
+	opacity: 1;
+	visibility: visible;
+}
+
+.back-to-top:hover {
+	transform: scale(1.06);
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* 點擊 pulse 動畫（替代 inline style） */
+@keyframes pulse {
+	0% { transform: scale(1); }
+	35% { transform: scale(0.96); }
+	100% { transform: scale(1); }
+}
+
+.pulse {
+	animation: pulse 0.28s ease-in-out;
+}
+
+/* IntersectionObserver 顯示樣式 */
+.card { opacity: 0; transform: translateY(10px); transition: opacity 0.45s ease, transform 0.45s ease; }
+.card.visible { opacity: 1; transform: none; }

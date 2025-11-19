@@ -46,23 +46,15 @@ function initCardInteractions() {
     const cards = document.querySelectorAll('.card');
     
     cards.forEach(card => {
-        // 滑鼠進入效果
-        card.addEventListener('mouseenter', function() {
-            this.style.transform = 'translateY(-4px)';
-        });
-        
-        // 滑鼠離開效果
-        card.addEventListener('mouseleave', function() {
-            this.style.transform = 'translateY(0)';
-        });
+        // 卡片的 hover 效果由 CSS 處理 (.card:hover)，無需在 JS 中使用 inline styles
         
         // 點擊效果
         card.addEventListener('click', function(e) {
             // 如果點擊的不是連結，則添加脈衝效果
             if (!e.target.closest('a')) {
-                this.style.animation = 'pulse 0.3s ease';
+                this.classList.add('pulse');
                 setTimeout(() => {
-                    this.style.animation = '';
+                    this.classList.remove('pulse');
                 }, 300);
             }
         });
@@ -90,35 +82,16 @@ function initBackToTop() {
     backToTopBtn.innerHTML = '↑';
     backToTopBtn.className = 'back-to-top';
     backToTopBtn.setAttribute('aria-label', '返回頂部');
-    backToTopBtn.style.cssText = `
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        background: #0f1724;
-        color: white;
-        border: none;
-        font-size: 24px;
-        cursor: pointer;
-        opacity: 0;
-        visibility: hidden;
-        transition: all 0.3s ease;
-        z-index: 1000;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    `;
+    // 樣式已移到 css（.back-to-top），此處只維持 class
     
     document.body.appendChild(backToTopBtn);
     
     // 滾動顯示/隱藏按鈕
     window.addEventListener('scroll', () => {
         if (window.pageYOffset > 300) {
-            backToTopBtn.style.opacity = '1';
-            backToTopBtn.style.visibility = 'visible';
+            backToTopBtn.classList.add('visible');
         } else {
-            backToTopBtn.style.opacity = '0';
-            backToTopBtn.style.visibility = 'hidden';
+            backToTopBtn.classList.remove('visible');
         }
     });
     
@@ -130,16 +103,7 @@ function initBackToTop() {
         });
     });
     
-    // 懸停效果
-    backToTopBtn.addEventListener('mouseenter', function() {
-        this.style.transform = 'scale(1.1)';
-        this.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.2)';
-    });
-    
-    backToTopBtn.addEventListener('mouseleave', function() {
-        this.style.transform = 'scale(1)';
-        this.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-    });
+    // 懸停效果由 CSS :hover 處理（.back-to-top:hover）
 }
 
 /**
