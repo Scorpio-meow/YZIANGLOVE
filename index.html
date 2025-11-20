@@ -184,8 +184,17 @@
     <script>
         (function () {
             var GAP = 12;
-            var BASE_W = 320;
             var raf = window.requestAnimationFrame || function (cb) { return setTimeout(cb, 16); };
+            
+            function getColumnConfig() {
+                var w = window.innerWidth;
+                if (w < 576) return { columns: 1, minWidth: 280 };
+                if (w < 768) return { columns: 2, minWidth: 260 };
+                if (w < 992) return { columns: 2, minWidth: 280 };
+                if (w < 1200) return { columns: 3, minWidth: 280 };
+                if (w < 1600) return { columns: 4, minWidth: 300 };
+                return { columns: 5, minWidth: 300 };
+            }
             function getNumber(value) { var n = parseFloat(value); return isNaN(n) ? 0 : n; }
             function layoutMasonry() {
                 var container = document.getElementById('posts-container');
@@ -197,7 +206,9 @@
                 var padT = getNumber(cs.paddingTop), padB = getNumber(cs.paddingBottom);
                 var innerW = container.clientWidth - padL - padR;
                 if (innerW <= 0) return;
-                var cols = Math.max(1, Math.floor((innerW + GAP) / (BASE_W + GAP)));
+                
+                var config = getColumnConfig();
+                var cols = Math.min(config.columns, Math.max(1, Math.floor((innerW + GAP) / (config.minWidth + GAP))));
                 var colW = (innerW - GAP * (cols - 1)) / cols;
                 var colHeights = new Array(cols).fill(0);
 
@@ -220,8 +231,17 @@
                 container.style.height = (padT + maxH + padB) + 'px';
             }
             var pending = false;
-            function relayout() { if (pending) return; pending = true; raf(function () { pending = false; layoutMasonry(); }); }
+            var resizeTimer;
+            function relayout() { 
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(function() {
+                    if (pending) return; 
+                    pending = true; 
+                    raf(function () { pending = false; layoutMasonry(); }); 
+                }, 100);
+            }
             window.addEventListener('resize', relayout);
+            window.addEventListener('orientationchange', relayout);
             window.addEventListener('load', relayout);
             window.addEventListener('masonry:render-ready', relayout);
             window.addEventListener('load', function () { setTimeout(relayout, 200); setTimeout(relayout, 600); });
