@@ -6,6 +6,81 @@
     // 通用工具
     const scheduleMicrotask = typeof queueMicrotask === 'function' ? queueMicrotask : cb => Promise.resolve().then(cb);
 
+    // SPA 路由系統
+    (function() {
+        const routes = {
+            'home': { title: 'Threads 精選貼文', contentId: 'home-content' },
+            'tech': { title: 'Threads 科技類別', contentId: 'tech-content' }
+        };
+
+        let currentRoute = 'home';
+
+        function showContent(routeName) {
+            const route = routes[routeName];
+            if (!route) return;
+
+            // 隱藏所有內容區塊
+            Object.values(routes).forEach(r => {
+                const el = document.getElementById(r.contentId);
+                if (el) el.style.display = 'none';
+            });
+
+            // 顯示當前路由的內容
+            const content = document.getElementById(route.contentId);
+            if (content) {
+                content.style.display = 'grid';
+                // 重新觸發卡片動畫
+                requestAnimationFrame(() => {
+                    const cards = content.querySelectorAll('.card:not(.visible)');
+                    cards.forEach(card => card.classList.add('visible'));
+                });
+            }
+
+            // 更新導航高亮
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.toggle('active', link.dataset.route === routeName);
+            });
+
+            currentRoute = routeName;
+        }
+
+        function handleNavigation(routeName, updateHistory = true) {
+            showContent(routeName);
+            if (updateHistory) {
+                const path = routeName === 'home' ? '/' : `/${routeName}`;
+                history.pushState({ route: routeName }, '', path);
+            }
+            // 重新初始化視頻自動播放
+            if (App.initVideoAutoplay) {
+                scheduleMicrotask(() => App.initVideoAutoplay());
+            }
+        }
+
+        App.initRouter = function() {
+            // 處理導航連結點擊
+            document.addEventListener('click', function(e) {
+                const link = e.target.closest('a.nav-link');
+                if (!link) return;
+                e.preventDefault();
+                const routeName = link.dataset.route;
+                if (routeName && routeName !== currentRoute) {
+                    handleNavigation(routeName, true);
+                }
+            });
+
+            // 處理瀏覽器的前進/後退按鈕
+            window.addEventListener('popstate', function(e) {
+                const routeName = e.state?.route || 'home';
+                handleNavigation(routeName, false);
+            });
+
+            // 初始化路由狀態
+            const path = window.location.pathname;
+            const initialRoute = path === '/tech' ? 'tech' : 'home';
+            handleNavigation(initialRoute, false);
+        };
+    })();
+
     function throttle(fn, wait = 100) {
         let last = 0;
         let timeout;
@@ -111,19 +186,25 @@
         });
     };
 
-    // 滾動顯示動畫（IntersectionObserver）
+    // 滾動顯示動畫(IntersectionObserver) - 優化版
     App.initScrollAnimation = function() {
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     entry.target.classList.add('visible');
-                    // 如果希望只在第一次顯示取消觀察，可取代下面註解
-                    // observer.unobserve(entry.target);
+                    // 優化:顯示後取消觀察,減少性能開銷
+                    observer.unobserve(entry.target);
                 }
             });
-        }, { threshold: 0.12, rootMargin: '0px 0px -48px 0px' });
+        }, { 
+            threshold: 0.12, 
+            rootMargin: '0px 0px -48px 0px'
+        });
 
-        document.querySelectorAll('.card').forEach(card => observer.observe(card));
+        // 使用 requestAnimationFrame 批次處理
+        requestAnimationFrame(() => {
+            document.querySelectorAll('.card').forEach(card => observer.observe(card));
+        });
     };
 
     // Video autoplay tracking (Shadow DOM aware)
@@ -181,19 +262,39 @@
             videoAutoplayReady = true;
             trackVideoRoot(document);
             if (pendingVideoRoots.size) { pendingVideoRoots.forEach(r => trackVideoRoot(r)); pendingVideoRoots.clear(); }
-            setInterval(() => trackedVideoRoots.forEach(scanVideosInRoot), 2_000);
+            // 優化:使用 requestIdleCallback 進行低優先級掃描
+            const periodicScan = () => {
+                if ('requestIdleCallback' in window) {
+                    requestIdleCallback(() => {
+                        trackedVideoRoots.forEach(scanVideosInRoot);
+                        setTimeout(periodicScan, 3000);
+                    }, { timeout: 5000 });
+                } else {
+                    trackedVideoRoots.forEach(scanVideosInRoot);
+                    setTimeout(periodicScan, 3000);
+                }
+            };
+            periodicScan();
         };
     })();
 
-    // 載入 Threads embed script
+    // 載入 Threads embed script (優化版)
     App.loadThreadsEmbed = function() {
         const selector = 'script[src="https://www.threads.com/embed.js"]';
         if (!document.querySelector(selector)) {
             const tag = document.createElement('script');
             tag.src = 'https://www.threads.com/embed.js';
             tag.async = true;
-            tag.onload = () => setTimeout(App.initVideoAutoplay, 800);
-            document.body.appendChild(tag);
+            tag.defer = true;
+            tag.onload = () => {
+                // 使用 requestIdleCallback 延遲非關鍵初始化
+                if ('requestIdleCallback' in window) {
+                    requestIdleCallback(() => App.initVideoAutoplay(), { timeout: 1000 });
+                } else {
+                    setTimeout(App.initVideoAutoplay, 500);
+                }
+            };
+            document.head.appendChild(tag);
         } else {
             App.initVideoAutoplay();
         }
@@ -219,6 +320,7 @@
         App.initCardInteractions();
         App.initScrollAnimation();
         App.loadThreadsEmbed();
+        App.initRouter(); // 初始化 SPA 路由
     });
 
     // Window load hooks
