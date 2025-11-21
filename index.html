@@ -13,8 +13,8 @@
             console.error = function () {
                 var args = Array.prototype.slice.call(arguments);
                 var msg = args.join(' ');
-                if (msg.includes('cdninstagram.com') && msg.includes('404')) return;
-                if (msg.includes('favicon.ico') && msg.includes('404')) return;
+                if (/https?:\/\/[^\/]*cdninstagram\.com.*404/.test(msg)) return;
+                if (/favicon\.ico.*404|404.*favicon\.ico/.test(msg)) return;
                 originalError.apply(console, arguments);
             };
         })();
