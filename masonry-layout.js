@@ -4,8 +4,8 @@
     var resizeObserver = null;
     function getColumnConfig() {
         var w = window.innerWidth;
-        if (w < 576) return { columns: 1, minWidth: 280 };
-        if (w < 900) return { columns: 1, minWidth: 320 };
+        if (w < 576) return { columns: 1, minWidth: 240 };
+        if (w < 900) return { columns: 1, minWidth: 300 };
         return { columns: 2, minWidth: 400 };
     }
     function getNumber(value) { var n = parseFloat(value); return isNaN(n) ? 0 : n; }
@@ -61,11 +61,19 @@
             if (pending) return;
             pending = true;
             raf(function () { pending = false; layoutMasonry(); });
-        }, 100);
+        }, 50);
     }
     window.addEventListener('resize', relayout);
     window.addEventListener('orientationchange', relayout);
     window.addEventListener('load', relayout);
     window.addEventListener('masonry:render-ready', relayout);
-    window.addEventListener('load', function () { setTimeout(relayout, 200); setTimeout(relayout, 600); setTimeout(relayout, 1200); setTimeout(relayout, 2000); });
+    window.addEventListener('load', function () { 
+        setTimeout(relayout, 100);
+        setTimeout(relayout, 300);
+        setTimeout(relayout, 600); 
+        setTimeout(relayout, 1000);
+        setTimeout(relayout, 1500); 
+        setTimeout(relayout, 2500); 
+        setTimeout(relayout, 4000);
+    });
 })();

@@ -16,6 +16,12 @@ body {
     min-height: 100vh;
 }
 
+@media (max-width: 576px) {
+    #posts-container {
+        padding: 8px 12px;
+    }
+}
+
 .post-item {
     position: absolute;
     margin: 0;
@@ -23,6 +29,8 @@ body {
     overflow: hidden;
     left: 0;
     top: 0;
+    transition: transform 0.3s ease;
+    will-change: transform;
 }
 
 .post-item blockquote.text-post-media {

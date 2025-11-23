@@ -130,9 +130,12 @@
             }
             function triggerRelayouts() {
                 window.dispatchEvent(new Event('masonry:render-ready'));
+                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 100);
                 setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 300);
-                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 800);
+                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 600);
+                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 1000);
                 setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 1500);
+                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 2500);
             }
             timeout = setTimeout(function () {
                 console.warn('[警告] iframe 載入超時');
