@@ -79,14 +79,6 @@
             return;
         }
 
-        var existingScript = document.querySelector('script[src="https://www.threads.com/embed.js"]');
-        if (existingScript) {
-            embedScriptLoaded = true;
-            console.log('[資訊] Threads embed script 已存在於 DOM 中');
-            if (callback) callback();
-            return;
-        }
-
         var retryCount = 0;
         function attemptLoad() {
             var script = document.createElement('script');
@@ -97,9 +89,7 @@
                 if (retryCount < MAX_RETRIES) {
                     console.warn('[警告] Threads embed script 載入失敗,重試中... (' + retryCount + '/' + MAX_RETRIES + ')');
                     setTimeout(function () {
-                        if (script.parentNode) {
-                            script.parentNode.removeChild(script);
-                        }
+                        document.body.removeChild(script);
                         attemptLoad();
                     }, Math.pow(2, retryCount) * 1000);
                 } else {
