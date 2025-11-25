@@ -4,20 +4,24 @@
     } else {
         init();
     }
-
     var embedScriptLoaded = false;
-    var pendingEmbeds = [];
+    var embedScriptLoading = false;
+    var allBlockquotes = [];
+    var currentIndex = 0;
     var processing = false;
+    var paused = false;
     var currentDelay = LOAD_DELAY;
     var rateLimitDetected = false;
+    var consecutiveErrors = 0;
+    var lastRequestTime = 0;
     var stats = {
         total: 0,
         loaded: 0,
         failed: 0,
+        rateLimitHits: 0,
         startTime: Date.now(),
         loadTimes: []
     };
-
     function logStats() {
         if (stats.total === 0) return;
         var avgLoadTime = stats.loadTimes.length > 0 ?
@@ -26,79 +30,141 @@
             總數: stats.total,
             已載入: stats.loaded,
             失敗: stats.failed,
-            成功率: ((stats.loaded / stats.total) * 100).toFixed(1) + '%',
+            速率限制次數: stats.rateLimitHits,
+            成功率: stats.total > 0 ? ((stats.loaded / stats.total) * 100).toFixed(1) + '%' : '0%',
             耗時: ((Date.now() - stats.startTime) / 1000).toFixed(1) + '秒',
             當前延遲: (currentDelay / 1000).toFixed(1) + '秒',
             平均載入時間: avgLoadTime + '秒'
         });
     }
+    function handleRateLimit(source) {
+        if (rateLimitDetected) return;
+        rateLimitDetected = true;
+        paused = true;
+        processing = false;
+        stats.rateLimitHits++;
+        consecutiveErrors++;
+        var backoffTime = Math.min(RATE_LIMIT_BACKOFF * Math.pow(1.5, consecutiveErrors - 1), 300000);
+        currentDelay = Math.min(currentDelay * 2, MAX_DELAY);
+        console.warn('[警告] 偵測到速率限制 (' + source + '),暫停載入 ' + (backoffTime / 1000) + ' 秒');
+        console.warn('[警告] 調整延遲時間為 ' + (currentDelay / 1000) + ' 秒');
+        setTimeout(function () {
+            rateLimitDetected = false;
+            paused = false;
+            if (consecutiveErrors > 3) {
+                currentDelay = MAX_DELAY;
+            } else {
+                currentDelay = Math.max(LOAD_DELAY, currentDelay / 1.5);
+            }
+            console.log('[恢復] 速率限制解除,恢復載入,延遲: ' + (currentDelay / 1000) + ' 秒');
+            processSingleEmbed();
+        }, backoffTime);
+    }
+    window.addEventListener('threads:rate-limit', function (e) {
+        handleRateLimit('console');
+    });
     window.addEventListener('error', function (e) {
-        if (e.message && (e.message.includes('429') || e.message.includes('rate limit'))) {
-            rateLimitDetected = true;
-            currentDelay = Math.min(currentDelay * 2, 30000);
-            console.warn('[警告] 偵測到速率限制,延遲時間調整為 ' + (currentDelay / 1000) + ' 秒');
-            setTimeout(function () {
-                rateLimitDetected = false;
-                currentDelay = LOAD_DELAY;
-                console.log('[成功] 速率限制解除,恢復正常延遲');
-            }, 600000);
+        if (e.message && (e.message.includes('429') || e.message.includes('rate limit') || e.message.includes('Too Many Requests'))) {
+            handleRateLimit('error-event');
+        }
+        if (e.target && e.target.tagName === 'SCRIPT' && e.target.src && e.target.src.includes('threads.com')) {
+            handleRateLimit('script-error');
         }
     }, true);
+    window.addEventListener('unhandledrejection', function (e) {
+        if (e.reason && e.reason.message && (e.reason.message.includes('429') || e.reason.message.includes('rate limit'))) {
+            handleRateLimit('promise-rejection');
+        }
+    });
     (function () {
         var originalFetch = window.fetch;
         if (originalFetch) {
-            window.fetch = function () {
-                return originalFetch.apply(this, arguments).catch(function (error) {
-                    if (error.message && error.message.includes('429')) {
-                        rateLimitDetected = true;
-                        currentDelay = Math.min(currentDelay * 2, 30000);
-                        console.error('[錯誤] 偵測到 429 錯誤,暫停載入並增加延遲至 ' + (currentDelay / 1000) + ' 秒');
-                        processing = false;
-                        setTimeout(function () {
-                            console.log('[重試] 重新開始載入...');
-                            rateLimitDetected = false;
-                            currentDelay = LOAD_DELAY;
-                            processNextEmbed();
-                        }, 600000);
-                    }
-                    throw error;
-                });
+            window.fetch = function (url, options) {
+                return originalFetch.apply(this, arguments)
+                    .then(function (response) {
+                        if (response.status === 429) {
+                            handleRateLimit('fetch-response');
+                            throw new Error('Rate limited (429)');
+                        }
+                        if (response.ok) {
+                            consecutiveErrors = Math.max(0, consecutiveErrors - 1);
+                        }
+                        return response;
+                    })
+                    .catch(function (error) {
+                        if (error.message && (error.message.includes('429') || error.message.includes('rate limit'))) {
+                            handleRateLimit('fetch-error');
+                        }
+                        throw error;
+                    });
             };
         }
+        var originalXHROpen = XMLHttpRequest.prototype.open;
+        var originalXHRSend = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.open = function (method, url) {
+            this._url = url;
+            return originalXHROpen.apply(this, arguments);
+        };
+        XMLHttpRequest.prototype.send = function () {
+            var xhr = this;
+            xhr.addEventListener('load', function () {
+                if (xhr.status === 429) {
+                    handleRateLimit('xhr-response');
+                }
+            });
+            xhr.addEventListener('error', function () {
+                if (xhr._url && xhr._url.includes('threads.com')) {
+                    handleRateLimit('xhr-error');
+                }
+            });
+            return originalXHRSend.apply(this, arguments);
+        };
     })();
     function loadEmbedScript(callback) {
         if (embedScriptLoaded) {
             if (callback) callback();
             return;
         }
-
+        if (embedScriptLoading) {
+            var checkInterval = setInterval(function () {
+                if (embedScriptLoaded) {
+                    clearInterval(checkInterval);
+                    if (callback) callback();
+                }
+            }, 100);
+            return;
+        }
         if (window.threadsEmbed && typeof window.threadsEmbed.process === 'function') {
             embedScriptLoaded = true;
             console.log('[資訊] Threads embed script 已存在(快取)');
             if (callback) callback();
             return;
         }
-
+        embedScriptLoading = true;
         var retryCount = 0;
         function attemptLoad() {
             var script = document.createElement('script');
             script.async = true;
-            script.src = 'https://www.threads.com/embed.js';
+            script.src = 'https://www.threads.net/embed.js';
             script.onerror = function () {
                 retryCount++;
                 if (retryCount < MAX_RETRIES) {
                     console.warn('[警告] Threads embed script 載入失敗,重試中... (' + retryCount + '/' + MAX_RETRIES + ')');
                     setTimeout(function () {
-                        document.body.removeChild(script);
+                        if (script.parentNode) {
+                            script.parentNode.removeChild(script);
+                        }
                         attemptLoad();
                     }, Math.pow(2, retryCount) * 1000);
                 } else {
                     console.error('[錯誤] Threads embed script 載入失敗,已達最大重試次數');
+                    embedScriptLoading = false;
                     stats.failed++;
                 }
             };
             script.onload = function () {
                 embedScriptLoaded = true;
+                embedScriptLoading = false;
                 console.log('[成功] Threads embed script 載入成功');
                 if (callback) callback();
             };
@@ -121,131 +187,188 @@
             indicator.parentNode.removeChild(indicator);
         }
     }
-    function waitForIframeLoad(blockquote) {
+    function triggerRelayouts() {
+        window.dispatchEvent(new Event('masonry:render-ready'));
+        setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 100);
+        setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 300);
+        setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 600);
+        setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 1000);
+    }
+    function waitForIframeLoad(blockquote, timeout) {
         return new Promise(function (resolve) {
-            var timeout, observer;
+            var timeoutId, observer;
+            var resolved = false;
             function cleanup() {
-                if (timeout) clearTimeout(timeout);
+                if (timeoutId) clearTimeout(timeoutId);
                 if (observer) observer.disconnect();
             }
-            function triggerRelayouts() {
-                window.dispatchEvent(new Event('masonry:render-ready'));
-                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 100);
-                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 300);
-                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 600);
-                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 1000);
-                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 1500);
-                setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 2500);
+            function done(success) {
+                if (resolved) return;
+                resolved = true;
+                cleanup();
+                triggerRelayouts();
+                resolve(success);
             }
-            timeout = setTimeout(function () {
-                console.warn('[警告] iframe 載入超時');
-                cleanup();
-                resolve(false);
-            }, IFRAME_TIMEOUT);
+            timeoutId = setTimeout(function () {
+                done(false);
+            }, timeout || IFRAME_TIMEOUT);
             if (!('MutationObserver' in window)) {
-                cleanup();
-                setTimeout(function () {
-                    triggerRelayouts();
-                    resolve(true);
-                }, 2000);
+                setTimeout(function () { done(true); }, 2000);
+                return;
+            }
+            var parentNode = blockquote.parentNode;
+            if (!parentNode) {
+                done(false);
                 return;
             }
             observer = new MutationObserver(function (mutations) {
-                mutations.forEach(function (mutation) {
-                    mutation.addedNodes.forEach(function (node) {
+                for (var i = 0; i < mutations.length; i++) {
+                    var mutation = mutations[i];
+                    for (var j = 0; j < mutation.addedNodes.length; j++) {
+                        var node = mutation.addedNodes[j];
                         if (node.tagName === 'IFRAME') {
                             node.addEventListener('load', function () {
-                                cleanup();
-                                triggerRelayouts();
-                                resolve(true);
+                                done(true);
                             }, { once: true });
+
                             if (node.contentWindow) {
                                 try {
                                     if (node.contentWindow.document.readyState === 'complete') {
-                                        cleanup();
-                                        triggerRelayouts();
-                                        resolve(true);
+                                        done(true);
                                     }
                                 } catch (e) {
-                                    cleanup();
-                                    triggerRelayouts();
-                                    resolve(true);
+                                    setTimeout(function () { done(true); }, 500);
                                 }
                             }
                         }
-                    });
-                });
+                    }
+                }
             });
-            observer.observe(blockquote.parentNode, {
+            observer.observe(parentNode, {
                 childList: true,
                 subtree: true
             });
+            var existingIframe = parentNode.querySelector('iframe');
+            if (existingIframe) {
+                done(true);
+            }
         });
     }
-    function processNextEmbed() {
-        if (processing || pendingEmbeds.length === 0) return;
+    function processSingleEmbed() {
+        if (processing || paused || rateLimitDetected) {
+            return;
+        }
+        if (currentIndex >= allBlockquotes.length) {
+            if (stats.total > 0) {
+                logStats();
+            }
+            return;
+        }
+        var now = Date.now();
+        var timeSinceLastRequest = now - lastRequestTime;
+        var minDelay = typeof MIN_DELAY_BETWEEN_REQUESTS !== 'undefined' ? MIN_DELAY_BETWEEN_REQUESTS : 2000;
+        if (lastRequestTime > 0 && timeSinceLastRequest < minDelay) {
+            setTimeout(processSingleEmbed, minDelay - timeSinceLastRequest);
+            return;
+        }
+        var blockquote = allBlockquotes[currentIndex];
+        if (blockquote.dataset.embedLoaded === 'true') {
+            currentIndex++;
+            processSingleEmbed();
+            return;
+        }
         processing = true;
-        var blockquote = pendingEmbeds.shift();
+        lastRequestTime = Date.now();
         var indicator = addLoadingIndicator(blockquote);
         stats.total++;
         var itemStartTime = Date.now();
-        var remaining = pendingEmbeds.length;
-        console.log('[載入] 載入中 (' + stats.total + '/' + (stats.total + remaining) + ')');
+        console.log('[載入] 載入中 (' + (currentIndex + 1) + '/' + allBlockquotes.length + ') - 延遲: ' + (currentDelay / 1000) + '秒');
+        blockquote.dataset.embedLoading = 'true';
+        var hiddenBlockquotes = [];
+        for (var i = 0; i < allBlockquotes.length; i++) {
+            if (i !== currentIndex &&
+                allBlockquotes[i].dataset.embedLoaded !== 'true' &&
+                allBlockquotes[i].dataset.embedLoading !== 'true' &&
+                allBlockquotes[i].classList.contains('text-post-media')) {
+                hiddenBlockquotes.push(allBlockquotes[i]);
+                allBlockquotes[i].classList.remove('text-post-media');
+                allBlockquotes[i].classList.add('text-post-media-pending');
+            }
+        }
+        
+        function restoreHiddenBlockquotes() {
+            for (var i = 0; i < hiddenBlockquotes.length; i++) {
+                hiddenBlockquotes[i].classList.remove('text-post-media-pending');
+                hiddenBlockquotes[i].classList.add('text-post-media');
+            }
+        }
+        
         try {
             if (window.threadsEmbed && typeof window.threadsEmbed.process === 'function') {
                 window.threadsEmbed.process();
-                waitForIframeLoad(blockquote)
-                    .then(function (success) {
-                        var loadTime = (Date.now() - itemStartTime) / 1000;
-                        stats.loadTimes.push(loadTime);
-                        if (success) {
-                            stats.loaded++;
-                            console.log('[成功] 載入成功 #' + stats.loaded + ' (耗時: ' + loadTime.toFixed(2) + '秒)');
-                        } else {
-                            stats.failed++;
-                            var postItem = blockquote.closest('.post-item');
-                            if (postItem) {
-                                postItem.classList.add('error');
-                            }
-                        }
-                        removeLoadingIndicator(indicator);
-                        processing = false;
-                        window.dispatchEvent(new Event('masonry:render-ready'));
-                        if (pendingEmbeds.length > 0) {
-                            setTimeout(processNextEmbed, currentDelay);
-                        } else {
-                            logStats();
-                        }
-                    })
-                    .catch(function (error) {
-                        console.error('[錯誤] Promise 錯誤:', error);
-                        stats.failed++;
-                        removeLoadingIndicator(indicator);
-                        processing = false;
-                        if (pendingEmbeds.length > 0) {
-                            setTimeout(processNextEmbed, currentDelay);
-                        } else {
-                            logStats();
-                        }
-                    });
-                return;
             }
         } catch (e) {
-            console.error('[錯誤] 處理錯誤:', e);
-            stats.failed++;
+            console.error('[錯誤] threadsEmbed.process 錯誤:', e);
         }
-        removeLoadingIndicator(indicator);
-        processing = false;
-        if (pendingEmbeds.length > 0) {
-            setTimeout(processNextEmbed, currentDelay);
-        } else {
-            logStats();
-        }
+        
+        waitForIframeLoad(blockquote, IFRAME_TIMEOUT)
+            .then(function (success) {
+                var loadTime = (Date.now() - itemStartTime) / 1000;
+                stats.loadTimes.push(loadTime);
+                blockquote.dataset.embedLoading = 'false';
+                blockquote.dataset.embedLoaded = 'true';
+                restoreHiddenBlockquotes();
+                if (success) {
+                    stats.loaded++;
+                    consecutiveErrors = Math.max(0, consecutiveErrors - 1);
+                    if (consecutiveErrors === 0 && currentDelay > LOAD_DELAY) {
+                        currentDelay = Math.max(LOAD_DELAY, currentDelay * 0.95);
+                    }
+                    console.log('[成功] 載入成功 #' + stats.loaded + ' (耗時: ' + loadTime.toFixed(2) + '秒)');
+                } else {
+                    stats.failed++;
+                    console.warn('[警告] 載入超時 #' + (currentIndex + 1));
+                    var postItem = blockquote.closest('.post-item');
+                    if (postItem) {
+                        postItem.classList.add('error');
+                        postItem.style.display = 'none';
+                    }
+                }
+                removeLoadingIndicator(indicator);
+                processing = false;
+                currentIndex++;
+                triggerRelayouts();
+                if (currentIndex < allBlockquotes.length) {
+                    setTimeout(processSingleEmbed, currentDelay);
+                } else {
+                    logStats();
+                }
+            })
+            .catch(function (error) {
+                console.error('[錯誤] 處理錯誤:', error);
+                blockquote.dataset.embedLoading = 'false';
+                stats.failed++;
+                
+                restoreHiddenBlockquotes();
+                
+                var postItem = blockquote.closest('.post-item');
+                if (postItem) {
+                    postItem.style.display = 'none';
+                }
+                
+                removeLoadingIndicator(indicator);
+                processing = false;
+                currentIndex++;
+                if (currentIndex < allBlockquotes.length) {
+                    setTimeout(processSingleEmbed, currentDelay);
+                } else {
+                    logStats();
+                }
+            });
     }
     function init() {
         var container = document.getElementById('posts-container');
         if (!container) return;
-
         try {
             if (!Array.isArray(posts)) return;
         } catch (e) { return; }
@@ -264,83 +387,14 @@
         } else {
             setTimeout(function () { window.dispatchEvent(new Event('masonry:render-ready')); }, 0);
         }
-
         var blockquotes = container.querySelectorAll('blockquote.text-post-media');
-        console.log('[資訊] 共找到 ' + blockquotes.length + ' 個 Threads 貼文');
-
-        if ('IntersectionObserver' in window) {
-            var observer = new IntersectionObserver(function (entries) {
-                entries.forEach(function (entry) {
-                    if (entry.isIntersecting && !entry.target.dataset.processed) {
-                        entry.target.dataset.processed = 'true';
-
-                        var priority = entry.intersectionRatio > 0.5 ? 'high' : 'low';
-                        entry.target.dataset.priority = priority;
-
-                        if (priority === 'high') {
-                            pendingEmbeds.unshift(entry.target);
-                            console.log('[載入] 高優先級貼文 (可見度: ' + (entry.intersectionRatio * 100).toFixed(0) + '%)');
-                        } else {
-                            pendingEmbeds.push(entry.target);
-                        }
-
-                        observer.unobserve(entry.target);
-
-                        if (!embedScriptLoaded) {
-                            loadEmbedScript(processNextEmbed);
-                        } else {
-                            processNextEmbed();
-                        }
-                    }
-                });
-            }, {
-                rootMargin: '200px',
-                threshold: [0.1, 0.5]
-            });
-
-            for (var j = 0; j < blockquotes.length; j++) {
-                observer.observe(blockquotes[j]);
-            }
-        } else {
-            console.log('[警告] 不支援 Intersection Observer,使用降級方案');
-            loadEmbedScript(function () {
-                var index = 0;
-                function processBatch() {
-                    if (index >= blockquotes.length) {
-                        logStats();
-                        return;
-                    }
-
-                    var endIdx = Math.min(index + BATCH_SIZE, blockquotes.length);
-                    console.log('[批次] 批次載入中 (' + (index + 1) + '-' + endIdx + '/' + blockquotes.length + ')');
-
-                    for (var k = index; k < endIdx; k++) {
-                        blockquotes[k].dataset.processed = 'true';
-                        stats.total++;
-                    }
-
-                    try {
-                        if (window.threadsEmbed && typeof window.threadsEmbed.process === 'function') {
-                            window.threadsEmbed.process();
-                            stats.loaded += (endIdx - index);
-                            console.log('[完成] 批次載入成功');
-                        }
-                    } catch (e) {
-                        console.error('[錯誤] 批次處理時發生錯誤:', e);
-                        stats.failed += (endIdx - index);
-                    }
-
-                    window.dispatchEvent(new Event('masonry:render-ready'));
-
-                    index = endIdx;
-                    if (index < blockquotes.length) {
-                        setTimeout(processBatch, currentDelay);
-                    } else {
-                        logStats();
-                    }
-                }
-                processBatch();
-            });
-        }
+        allBlockquotes = Array.prototype.slice.call(blockquotes);
+        console.log('[資訊] 共找到 ' + allBlockquotes.length + ' 個 Threads 貼文');
+        console.log('[資訊] 載入策略: 逐一載入,每個間隔 ' + (LOAD_DELAY / 1000) + ' 秒');
+        if (allBlockquotes.length === 0) return;
+        loadEmbedScript(function () {
+            console.log('[開始] 開始載入貼文...');
+            processSingleEmbed();
+        });
     }
 })();
