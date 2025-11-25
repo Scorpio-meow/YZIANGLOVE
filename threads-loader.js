@@ -22,6 +22,25 @@
         startTime: Date.now(),
         loadTimes: []
     };
+    // Allowed hosts for Threads resources
+    var ALLOWED_THREADS_HOSTS = ['threads.net', 'www.threads.net', 'threads.com', 'www.threads.com'];
+    // Helper: validate URL host against whitelist to avoid incomplete substring checks
+    function isHostAllowed(url, allowedHosts) {
+        try {
+            var parsed = new URL(url, window.location.href);
+            var host = parsed.hostname.toLowerCase();
+            for (var i = 0; i < allowedHosts.length; i++) {
+                var allowed = allowedHosts[i].toLowerCase();
+                if (host === allowed || host === '' + allowed || host.endsWith('.' + allowed)) {
+                    return true;
+                }
+            }
+        } catch (e) {
+            // If URL fails to parse, treat as not allowed
+            return false;
+        }
+        return false;
+    }
     function logStats() {
         if (stats.total === 0) return;
         var avgLoadTime = stats.loadTimes.length > 0 ?
@@ -67,7 +86,7 @@
         if (e.message && (e.message.includes('429') || e.message.includes('rate limit') || e.message.includes('Too Many Requests'))) {
             handleRateLimit('error-event');
         }
-        if (e.target && e.target.tagName === 'SCRIPT' && e.target.src && e.target.src.includes('threads.com')) {
+        if (e.target && e.target.tagName === 'SCRIPT' && e.target.src && isHostAllowed(e.target.src, ALLOWED_THREADS_HOSTS)) {
             handleRateLimit('script-error');
         }
     }, true);
@@ -113,7 +132,7 @@
                 }
             });
             xhr.addEventListener('error', function () {
-                if (xhr._url && xhr._url.includes('threads.com')) {
+                if (xhr._url && isHostAllowed(xhr._url, ALLOWED_THREADS_HOSTS)) {
                     handleRateLimit('xhr-error');
                 }
             });
