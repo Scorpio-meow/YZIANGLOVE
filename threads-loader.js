@@ -14,6 +14,9 @@
     var rateLimitDetected = false;
     var consecutiveErrors = 0;
     var lastRequestTime = 0;
+    var visibleQueue = [];
+    var observer = null;
+    var lazyLoadEnabled = true;
     var stats = {
         total: 0,
         loaded: 0,
@@ -187,6 +190,180 @@
             document.body.appendChild(script);
         }
         attemptLoad();
+    }
+    function setupIntersectionObserver() {
+        if (!('IntersectionObserver' in window)) {
+            console.warn('[警告] 瀏覽器不支援 IntersectionObserver，改用傳統載入方式');
+            lazyLoadEnabled = false;
+            return null;
+        }
+        var options = {
+            root: null,
+            rootMargin: '200px 0px',
+            threshold: 0.01
+        };
+        observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                var postItem = entry.target;
+                var blockquote = postItem.querySelector('blockquote.text-post-media');
+                if (!blockquote) return;
+                if (entry.isIntersecting) {
+                    if (blockquote.dataset.embedLoaded !== 'true' &&
+                        blockquote.dataset.embedLoading !== 'true' &&
+                        blockquote.dataset.inQueue !== 'true') {
+                        blockquote.dataset.inQueue = 'true';
+                        visibleQueue.push(blockquote);
+                        console.log('[Lazy] 貼文進入視窗，加入佇列 (佇列長度: ' + visibleQueue.length + ')');
+                        if (!processing && !paused && !rateLimitDetected) {
+                            processVisibleQueue();
+                        }
+                    }
+                }
+            });
+        }, options);
+        return observer;
+    }
+    function processVisibleQueue() {
+        if (processing || paused || rateLimitDetected) {
+            return;
+        }
+        while (visibleQueue.length > 0) {
+            var blockquote = visibleQueue[0];
+            if (blockquote.dataset.embedLoaded === 'true' ||
+                blockquote.dataset.embedLoading === 'true') {
+                visibleQueue.shift();
+                continue;
+            }
+            break;
+        }
+        if (visibleQueue.length === 0) {
+            console.log('[Lazy] 佇列已清空');
+            return;
+        }
+        var now = Date.now();
+        var timeSinceLastRequest = now - lastRequestTime;
+        var minDelay = typeof MIN_DELAY_BETWEEN_REQUESTS !== 'undefined' ? MIN_DELAY_BETWEEN_REQUESTS : 2000;
+        if (lastRequestTime > 0 && timeSinceLastRequest < minDelay) {
+            setTimeout(processVisibleQueue, minDelay - timeSinceLastRequest);
+            return;
+        }
+        var blockquote = visibleQueue.shift();
+        processBlockquote(blockquote);
+    }
+
+    function processBlockquote(blockquote) {
+        processing = true;
+        lastRequestTime = Date.now();
+        var indicator = addLoadingIndicator(blockquote);
+        stats.total++;
+
+        var itemStartTime = Date.now();
+        var processStart = performance.now();
+        var loadedCount = document.querySelectorAll('blockquote[data-embed-loaded="true"]').length;
+
+        console.log('[載入] 載入中 (' + (loadedCount + 1) + '/' + allBlockquotes.length + ') - 延遲: ' + (currentDelay / 1000) + '秒');
+
+        blockquote.dataset.embedLoading = 'true';
+
+        var container = document.getElementById('posts-container');
+        if (container) container.classList.add('is-loading');
+
+        var postItem = blockquote.closest('.post-item');
+        if (postItem) postItem.classList.add('current-loading');
+
+        scheduleIdle(function () {
+            try {
+                if (window.threadsEmbed && typeof window.threadsEmbed.process === 'function') {
+                    window.threadsEmbed.process();
+                }
+            } catch (e) {
+                console.error('[錯誤] threadsEmbed.process 錯誤:', e);
+            }
+        });
+
+        function restoreState() {
+            var container = document.getElementById('posts-container');
+            if (container) container.classList.remove('is-loading');
+            var postItem = blockquote.closest('.post-item');
+            if (postItem) postItem.classList.remove('current-loading');
+        }
+
+        waitForIframeLoad(blockquote, IFRAME_TIMEOUT)
+            .then(function (success) {
+                var loadTime = (Date.now() - itemStartTime) / 1000;
+                stats.loadTimes.push(loadTime);
+
+                blockquote.dataset.embedLoading = 'false';
+                blockquote.dataset.embedLoaded = 'true';
+                blockquote.dataset.inQueue = 'false';
+
+                restoreState();
+
+                if (success) {
+                    stats.loaded++;
+                    consecutiveErrors = Math.max(0, consecutiveErrors - 1);
+
+                    if (consecutiveErrors === 0 && currentDelay > LOAD_DELAY) {
+                        currentDelay = Math.max(LOAD_DELAY, currentDelay * 0.9);
+                    }
+
+                    console.log('[成功] 載入成功 #' + stats.loaded + ' (耗時: ' + loadTime.toFixed(2) + '秒)');
+                } else {
+                    stats.failed++;
+                    consecutiveErrors++;
+
+                    if (consecutiveErrors >= 2) {
+                        currentDelay = Math.min(currentDelay * 1.3, MAX_DELAY);
+                        console.warn('[警告] 連續超時，延遲增加到 ' + (currentDelay / 1000).toFixed(1) + ' 秒');
+                    }
+
+                    console.warn('[警告] 載入超時');
+
+                    if (postItem) {
+                        postItem.classList.add('error');
+                        postItem.style.display = 'none';
+                    }
+                }
+
+                removeLoadingIndicator(indicator);
+                processing = false;
+
+                var processElapsed = performance.now() - processStart;
+                if (processElapsed > 150) {
+                    console.warn('[性能] processBlockquote took ' + processElapsed.toFixed(1) + 'ms');
+                }
+
+                if (visibleQueue.length > 0) {
+                    setTimeout(processVisibleQueue, currentDelay);
+                } else {
+
+                    if (stats.total > 0 && stats.loaded + stats.failed === stats.total) {
+                        logStats();
+                    }
+                }
+            })
+            .catch(function (error) {
+                console.error('[錯誤] 處理錯誤:', error);
+
+                blockquote.dataset.embedLoading = 'false';
+                blockquote.dataset.inQueue = 'false';
+                stats.failed++;
+
+                restoreState();
+
+                var postItem = blockquote.closest('.post-item');
+                if (postItem) {
+                    postItem.style.display = 'none';
+                }
+
+                removeLoadingIndicator(indicator);
+                processing = false;
+
+
+                if (visibleQueue.length > 0) {
+                    setTimeout(processVisibleQueue, currentDelay);
+                }
+            });
     }
     function addLoadingIndicator(blockquote) {
         var indicator = document.createElement('div');
@@ -437,11 +614,34 @@
             var blockquotes = container.querySelectorAll('blockquote.text-post-media');
             allBlockquotes = Array.prototype.slice.call(blockquotes);
             console.log('[資訊] 共找到 ' + allBlockquotes.length + ' 個 Threads 貼文');
-            console.log('[資訊] 載入策略: 逐一載入,每個間隔 ' + (LOAD_DELAY / 1000) + ' 秒');
+
             if (allBlockquotes.length === 0) return;
+
             loadEmbedScript(function () {
                 console.log('[開始] 開始載入貼文...');
-                processSingleEmbed();
+
+                // 嘗試啟用 lazy loading
+                if (lazyLoadEnabled) {
+                    setupIntersectionObserver();
+                }
+
+                if (lazyLoadEnabled && observer) {
+                    // 使用 Lazy Loading 模式
+                    console.log('[資訊] 載入策略: Lazy Loading (僅載入可見貼文)');
+                    console.log('[資訊] 視窗預載範圍: 200px');
+
+                    // 觀察所有 post-item 元素
+                    var postItems = container.querySelectorAll('.post-item');
+                    postItems.forEach(function (item) {
+                        observer.observe(item);
+                    });
+
+                    console.log('[Lazy] 已開始監控 ' + postItems.length + ' 個貼文元素');
+                } else {
+                    // Fallback: 使用傳統逐一載入模式
+                    console.log('[資訊] 載入策略: 逐一載入,每個間隔 ' + (LOAD_DELAY / 1000) + ' 秒');
+                    processSingleEmbed();
+                }
             });
         });
     }
