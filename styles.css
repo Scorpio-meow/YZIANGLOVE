@@ -23,14 +23,12 @@ body {
 }
 
 .post-item {
-    position: absolute;
-    margin: 0;
+    position: relative;
+    display: block;
+    width: 100%;
+    margin: 12px 0;
     border-radius: 16px;
     overflow: hidden;
-    left: 0;
-    top: 0;
-    transition: transform 0.3s ease;
-    will-change: transform;
 }
 
 .post-item blockquote.text-post-media {
@@ -80,4 +78,14 @@ body {
     width: 32px;
     height: 32px;
     vertical-align: middle;
+}
+
+.is-loading .post-item:not(.current-loading) {
+    opacity: 0.45;
+    pointer-events: none;
+    transform: translateZ(0);
+}
+
+.post-item.current-loading {
+    opacity: 1;
 }
