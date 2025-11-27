@@ -308,6 +308,9 @@
                     }
 
                     console.log('[成功] 載入成功 #' + stats.loaded + ' (耗時: ' + loadTime.toFixed(2) + '秒)');
+                    if (observer && postItem) {
+                        observer.unobserve(postItem);
+                    }
                 } else {
                     stats.failed++;
                     consecutiveErrors++;
@@ -322,6 +325,9 @@
                     if (postItem) {
                         postItem.classList.add('error');
                         postItem.style.display = 'none';
+                        if (observer) {
+                            observer.unobserve(postItem);
+                        }
                     }
                 }
 
