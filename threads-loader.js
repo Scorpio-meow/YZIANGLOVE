@@ -116,7 +116,7 @@
         console.warn('[警告] 偵測到速率限制 (' + source + '),暫停載入 ' + (backoffTime / 1000) + ' 秒');
         showRateLimitBanner(backoffTime);
         console.warn('[警告] 調整延遲時間為 ' + (currentDelay / 1000) + ' 秒');
-        setTimeout(function () {
+        requestAnimationFrame(function () {
             rateLimitDetected = false;
             paused = false;
             if (consecutiveErrors > 3) {
@@ -739,7 +739,7 @@
                                     }
                                     markDone(true);
                                 }, { once: true });
-                                setTimeout(function () {
+                                requestAnimationFrame(function () {
                                     try {
                                         var src2 = iframeNode.getAttribute('src') || iframeNode.src || '';
                                         if (/chrome-error:|chromewebdata/i.test(src2)) {
@@ -919,22 +919,7 @@
         readUrlState();
         try {
             pageSizeSelectEl = document.getElementById('page-size-select');
-            if (pageSizeSelectEl) {
-                pageSizeSelectEl.value = String(pageSize);
-                pageSizeSelectEl.addEventListener('change', function (e) {
-                    var oldSize = pageSize;
-                    var newSize = parseIntSafe(e.target.value, pageSize);
-                    if (!Number.isFinite(newSize) || newSize <= 0) newSize = pageSize;
-                    if (newSize === oldSize) return;
-                    var firstIndex = (currentPage - 1) * oldSize;
-                    pageSize = newSize;
-                    totalPages = Math.max(1, Math.ceil(posts.length / pageSize));
-                    var newPage = Math.floor(firstIndex / pageSize) + 1;
-                    currentPage = Math.max(1, Math.min(totalPages, newPage));
-                    updateUrlParams(false);
-                    renderPage(currentPage, { push: false });
-                });
-            }
+            if (pageSizeSelectEl) pageSizeSelectEl.value = String(pageSize);
         } catch (e) { }
         function appendPostsInChunks(postsToAppend, done) {
             if (typeof postsToAppend === 'function') { done = postsToAppend; postsToAppend = posts; }
@@ -1004,6 +989,17 @@
             var paginationEl = document.getElementById('pagination');
             if (!paginationEl) return;
             paginationEl.innerHTML = '';
+            function navigateTo(pageNum, size) {
+                try {
+                    var u = new URL(window.location.href);
+                    u.searchParams.set('page', pageNum);
+                    u.searchParams.set('page_size', typeof size !== 'undefined' ? size : pageSize);
+                    window.location.href = u.toString();
+                } catch (e) {
+                    window.location.search = '?page=' + pageNum + '&page_size=' + (typeof size !== 'undefined' ? size : pageSize);
+                }
+            }
+
             function addBtn(label, page, disabled, active) {
                 var btn = document.createElement('button');
                 btn.className = 'page-btn' + (active ? ' active' : '');
@@ -1012,7 +1008,7 @@
                 if (!disabled) {
                     btn.addEventListener('click', function () {
                         if (page === currentPage) return;
-                        renderPage(page, { push: true });
+                        navigateTo(page, pageSize);
                     });
                 }
                 paginationEl.appendChild(btn);
@@ -1041,7 +1037,13 @@
             } catch (e) { }
             try {
                 pageSizeSelectEl = pageSizeSelectEl || document.getElementById('page-size-select');
-                if (pageSizeSelectEl) pageSizeSelectEl.value = String(pageSize);
+                if (pageSizeSelectEl) {
+                    pageSizeSelectEl.value = String(pageSize);
+                    pageSizeSelectEl.addEventListener('change', function () {
+                        var newSize = parseInt(this.value, 10) || pageSize;
+                        navigateTo(1, newSize);
+                    });
+                }
             } catch (e) { }
         }
         function renderPage(page, opts) {
@@ -1053,7 +1055,7 @@
             currentPage = page;
             clearPageState();
             container.innerHTML = '';
-            if (typeof window.scrollTo === 'function') window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
             appendPostsInChunks(getPagePosts(currentPage), function () {
                 requestAnimationFrame(function () {
                     var blockquotes = container.querySelectorAll('blockquote.text-post-media');
@@ -1070,8 +1072,40 @@
                     try { updateUrlParams(push); } catch (e) { }
                     if (allBlockquotes.length > 0) {
                         loadEmbedScript(function () {
+                            try { currentIndex = 0; } catch (e) { }
+                            processSingleEmbed();
                             if (!lazyLoadEnabled || !observer) {
-                                processSingleEmbed();
+                            } else {
+                                requestAnimationFrame(function () {
+                                    try {
+                                        var viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+                                        var postItems = container.querySelectorAll('.post-item');
+                                        var initialLoadCount = 0;
+                                        postItems.forEach(function (item) {
+                                            var rect = item.getBoundingClientRect();
+                                            if (rect.top < viewportHeight + 100 && rect.bottom > -100) {
+                                                var blockquote = item.querySelector('blockquote.text-post-media');
+                                                if (!blockquote) return;
+                                                if (blockquote.dataset.embedLoaded !== 'true' &&
+                                                    blockquote.dataset.embedLoading !== 'true' &&
+                                                    blockquote.dataset.inQueue !== 'true' &&
+                                                    !blockquote.dataset.embedFailed) {
+                                                    blockquote.dataset.inQueue = 'true';
+                                                    if (visibleQueue.length < MAX_VISIBLE_QUEUE) {
+                                                        visibleQueue.push(blockquote);
+                                                        initialLoadCount++;
+                                                    }
+                                                }
+                                            }
+                                        });
+                                        if (initialLoadCount > 0) {
+                                            console.log('[Init] 頁面載入時發現 ' + initialLoadCount + ' 個視窗內的貼文，加入佇列');
+                                        }
+                                        if (visibleQueue.length > 0 && !processing && !paused && !rateLimitDetected) {
+                                            processVisibleQueue();
+                                        }
+                                    } catch (e) { }
+                                });
                             }
                         });
                     }
