@@ -141,24 +141,6 @@ body {
     box-sizing: border-box;
 }
 
-.pagination-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.pagination-controls label {
-    font-size: 14px;
-    color: #333;
-}
-
-.pagination-controls select {
-    padding: 6px 8px;
-    font-size: 14px;
-    border-radius: 6px;
-    border: 1px solid #ddd;
-}
-
 .page-info {
     font-size: 14px;
     color: #666;

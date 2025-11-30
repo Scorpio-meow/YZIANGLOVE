@@ -24,7 +24,6 @@
     var pageSize = (typeof PAGE_SIZE !== 'undefined' ? PAGE_SIZE : 50);
     var currentPage = 1;
     var totalPages = 1;
-    var pageSizeSelectEl = null;
     var pageInfoEl = null;
 
     function readUrlState() {
@@ -917,10 +916,6 @@
         } catch (e) { return; }
         var CHUNK_APPEND_SIZE = 20;
         readUrlState();
-        try {
-            pageSizeSelectEl = document.getElementById('page-size-select');
-            if (pageSizeSelectEl) pageSizeSelectEl.value = String(pageSize);
-        } catch (e) { }
         function appendPostsInChunks(postsToAppend, done) {
             if (typeof postsToAppend === 'function') { done = postsToAppend; postsToAppend = posts; }
             if (!postsToAppend || postsToAppend.length === 0) return done();
@@ -986,9 +981,9 @@
             try { hideRateLimitBanner(); } catch (e) { }
         }
         function updatePaginationControls() {
-            var paginationEl = document.getElementById('pagination');
-            if (!paginationEl) return;
-            paginationEl.innerHTML = '';
+            var paginationEls = document.querySelectorAll('.pagination');
+            if (!paginationEls || paginationEls.length === 0) return;
+            paginationEls.forEach(function (el) { el.innerHTML = ''; });
             function navigateTo(pageNum, size) {
                 try {
                     var u = new URL(window.location.href);
@@ -1000,7 +995,7 @@
                 }
             }
 
-            function addBtn(label, page, disabled, active) {
+            function addBtnTo(parentEl, label, page, disabled, active) {
                 var btn = document.createElement('button');
                 btn.className = 'page-btn' + (active ? ' active' : '');
                 if (disabled) btn.setAttribute('disabled', 'disabled');
@@ -1011,38 +1006,32 @@
                         navigateTo(page, pageSize);
                     });
                 }
-                paginationEl.appendChild(btn);
+                parentEl.appendChild(btn);
             }
-            addBtn('Prev', Math.max(1, currentPage - 1), currentPage <= 1, false);
+            paginationEls.forEach(function (paginationEl) {
+                addBtnTo(paginationEl, 'Prev', Math.max(1, currentPage - 1), currentPage <= 1, false);
+            });
             var maxButtons = 9;
             if (totalPages <= maxButtons) {
                 for (var i = 1; i <= totalPages; i++) {
-                    addBtn(String(i), i, false, i === currentPage);
+                    paginationEls.forEach(function (paginationEl) { addBtnTo(paginationEl, String(i), i, false, i === currentPage); });
                 }
             } else {
-                addBtn('1', 1, false, 1 === currentPage);
+                paginationEls.forEach(function (paginationEl) { addBtnTo(paginationEl, '1', 1, false, 1 === currentPage); });
                 var left = Math.max(2, currentPage - 2);
                 var right = Math.min(totalPages - 1, currentPage + 2);
-                if (left > 2) { var ell = document.createElement('span'); ell.className = 'ellipsis'; ell.textContent = '...'; paginationEl.appendChild(ell); }
+                paginationEls.forEach(function (paginationEl) { if (left > 2) { var ell = document.createElement('span'); ell.className = 'ellipsis'; ell.textContent = '...'; paginationEl.appendChild(ell); } });
                 for (var p = left; p <= right; p++) {
-                    addBtn(String(p), p, false, p === currentPage);
+                    paginationEls.forEach(function (paginationEl) { addBtnTo(paginationEl, String(p), p, false, p === currentPage); });
                 }
-                if (right < totalPages - 1) { var ell2 = document.createElement('span'); ell2.className = 'ellipsis'; ell2.textContent = '...'; paginationEl.appendChild(ell2); }
-                addBtn(String(totalPages), totalPages, false, totalPages === currentPage);
+                paginationEls.forEach(function (paginationEl) { if (right < totalPages - 1) { var ell2 = document.createElement('span'); ell2.className = 'ellipsis'; ell2.textContent = '...'; paginationEl.appendChild(ell2); } });
+                paginationEls.forEach(function (paginationEl) { addBtnTo(paginationEl, String(totalPages), totalPages, false, totalPages === currentPage); });
             }
-            addBtn('Next', Math.min(totalPages, currentPage + 1), currentPage >= totalPages, false);
+            paginationEls.forEach(function (paginationEl) { addBtnTo(paginationEl, 'Next', Math.min(totalPages, currentPage + 1), currentPage >= totalPages, false); });
             try {
-                pageInfoEl = pageInfoEl || document.getElementById('page-info');
-                if (pageInfoEl) pageInfoEl.textContent = '第 ' + currentPage + ' / ' + totalPages + ' 頁';
-            } catch (e) { }
-            try {
-                pageSizeSelectEl = pageSizeSelectEl || document.getElementById('page-size-select');
-                if (pageSizeSelectEl) {
-                    pageSizeSelectEl.value = String(pageSize);
-                    pageSizeSelectEl.addEventListener('change', function () {
-                        var newSize = parseInt(this.value, 10) || pageSize;
-                        navigateTo(1, newSize);
-                    });
+                var pageInfoEls = document.querySelectorAll('.page-info');
+                if (pageInfoEls && pageInfoEls.length > 0) {
+                    pageInfoEls.forEach(function (pi) { pi.textContent = '第 ' + currentPage + ' / ' + totalPages + ' 頁'; });
                 }
             } catch (e) { }
         }
@@ -1114,13 +1103,11 @@
         }
         updatePaginationControls();
         renderPage(currentPage, { push: false });
-        try { if (pageSizeSelectEl) pageSizeSelectEl.value = String(pageSize); } catch (e) { }
         window.addEventListener('popstate', function () {
             try {
                 readUrlState();
                 totalPages = Math.max(1, Math.ceil(posts.length / pageSize));
                 currentPage = Math.max(1, Math.min(totalPages, currentPage));
-                try { if (pageSizeSelectEl) pageSizeSelectEl.value = String(pageSize); } catch (e) { }
                 renderPage(currentPage, { push: false });
             } catch (e) { }
         });
