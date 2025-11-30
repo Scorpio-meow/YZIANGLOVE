@@ -106,3 +106,77 @@ body {
 .post-item.current-loading {
     opacity: 1;
 }
+
+.pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 0 24px;
+}
+
+.pagination .page-btn {
+    border: 1px solid #ddd;
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+}
+
+.pagination .page-btn:hover {
+    background: #f5f5f5;
+}
+
+.pagination .page-btn.active {
+    background: #0a84ff;
+    color: white;
+    border-color: rgba(10, 132, 255, 0.6);
+}
+
+.pagination .page-btn[disabled] {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.pagination .ellipsis {
+    padding: 6px 10px;
+    color: #666;
+}
+
+.pagination-wrapper {
+    max-width: 1200px;
+    margin: 6px auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pagination-controls label {
+    font-size: 14px;
+    color: #333;
+}
+
+.pagination-controls select {
+    padding: 6px 8px;
+    font-size: 14px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+}
+
+.page-info {
+    font-size: 14px;
+    color: #666;
+    margin-left: auto;
+}

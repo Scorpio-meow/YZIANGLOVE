@@ -1,7 +1,6 @@
 (function () {
     var originalError = console.error;
     var originalWarn = console.warn;
-    
     console.error = function () {
         var args = Array.prototype.slice.call(arguments);
         var msg = args.join(' ');
@@ -12,9 +11,12 @@
             return;
         }
         if (/Failed to load resource.*threads\.com/i.test(msg)) return;
+        if (/Refused to display .* in a frame because it set 'X-Frame-Options' to 'deny'/i.test(msg)) {
+            window.dispatchEvent(new CustomEvent('threads:xframe-block', { detail: { message: msg } }));
+            return;
+        }
         originalError.apply(console, arguments);
     };
-    
     console.warn = function () {
         var args = Array.prototype.slice.call(arguments);
         var msg = args.join(' ');

@@ -16,6 +16,19 @@
         <p>探索精彩內容</p>
     </div>
     <div id="posts-container"></div>
+    <div class="pagination-wrapper">
+        <div class="pagination-controls">
+            <label for="page-size-select">每頁顯示：</label>
+            <select id="page-size-select" aria-label="每頁顯示數量">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+        <div id="page-info" class="page-info" aria-hidden="true"></div>
+        <div id="pagination" class="pagination" aria-label="分頁"></div>
+    </div>
     <script src="config.js"></script>
     <script src="threads-loader.js"></script>
 </body>
