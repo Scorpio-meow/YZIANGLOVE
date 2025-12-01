@@ -1,24 +1,118 @@
 :root {
     --card-height: 420px;
+    --primary: #0a84ff;
+    --primary-hover: #0070e0;
+    --primary-light: rgba(10, 132, 255, 0.1);
+    --gradient-threads: linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%);
+    --gradient-bg: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+    --bg-primary: #f8f9fa;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #e9ecef;
+    --text-primary: #1a1a1a;
+    --text-secondary: #6c757d;
+    --text-muted: #adb5bd;
+    --border-color: #dee2e6;
+    --border-light: #e9ecef;
+    --success: #28a745;
+    --error: #dc3545;
+    --warning: #ffc107;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.15);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
+    --transition-slow: 0.4s ease;
+}
+
+* {
+    box-sizing: border-box;
 }
 
 body {
     margin: 0;
-    background: #f7f7f8;
+    background: var(--gradient-bg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+.page-header {
+    text-align: center;
+    padding: 48px 20px 32px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-light);
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-threads);
+}
+
+.page-header h1 {
+    margin: 0 0 12px;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.page-header h1 img {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    transition: transform var(--transition-normal);
+}
+
+.page-header h1:hover img {
+    transform: rotate(-10deg) scale(1.1);
+}
+
+.page-header p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    font-weight: 400;
 }
 
 #posts-container {
     position: relative;
-    max-width: 1200px;
+    max-width: 680px;
     margin: 0 auto;
-    padding: 12px 20px;
+    padding: 24px 20px;
     box-sizing: border-box;
     min-height: 100vh;
 }
 
 @media (max-width: 576px) {
     #posts-container {
-        padding: 8px 12px;
+        padding: 16px 12px;
+    }
+
+    .page-header {
+        padding: 32px 16px 24px;
+    }
+
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .page-header p {
+        font-size: 0.95rem;
     }
 }
 
@@ -26,9 +120,50 @@ body {
     position: relative;
     display: block;
     width: 100%;
-    margin: 12px 0;
-    border-radius: 16px;
+    margin: 20px 0;
+    border-radius: var(--radius-lg);
     overflow: hidden;
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-md);
+    transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+    animation: fadeInUp 0.5s ease backwards;
+}
+
+.post-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.post-item:nth-child(1) {
+    animation-delay: 0.05s;
+}
+
+.post-item:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.post-item:nth-child(3) {
+    animation-delay: 0.15s;
+}
+
+.post-item:nth-child(4) {
+    animation-delay: 0.2s;
+}
+
+.post-item:nth-child(5) {
+    animation-delay: 0.25s;
 }
 
 .post-item blockquote.text-post-media {
@@ -36,59 +171,138 @@ body {
     max-width: 100% !important;
     width: 100% !important;
     margin: 0 !important;
+    border: none !important;
 }
 
 .post-item a {
     display: block;
 }
 
-.threads-loading {
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-    border-radius: 8px;
-    min-height: 100px;
-    padding: 20px;
-    text-align: center;
-    color: #999;
-    margin: 4px 0;
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
 }
 
-.post-item:not(:has(iframe)) blockquote.text-post-media {
-    min-height: 150px;
-    background: linear-gradient(90deg, #fafafa 25%, #f5f5f5 50%, #fafafa 75%);
-    border-radius: 12px;
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+}
+
+.threads-loading {
+    background: linear-gradient(90deg,
+            var(--bg-tertiary) 25%,
+            var(--bg-secondary) 50%,
+            var(--bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-md);
+    min-height: 120px;
+    padding: 24px;
+    text-align: center;
+    color: var(--text-muted);
+    margin: 4px 0;
     display: flex;
     align-items: center;
     justify-content: center;
-}
-
-.post-item:not(:has(iframe)) blockquote.text-post-media::before {
-    content: '捲動至此處載入貼文...';
-    color: #bbb;
     font-size: 14px;
 }
 
+.threads-loading::before {
+    content: '';
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-muted);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 12px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.post-item:not(:has(iframe)) blockquote.text-post-media {
+    min-height: 180px;
+    background: linear-gradient(90deg,
+            var(--bg-primary) 25%,
+            var(--bg-secondary) 50%,
+            var(--bg-primary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--border-color);
+}
+
+.post-item:not(:has(iframe)) blockquote.text-post-media::before {
+    content: '👇 捲動至此處載入貼文';
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 12px 20px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+}
+
 .post-item.error {
-    border: 2px solid #ff4444;
+    border: 2px solid var(--error);
     background: #fff5f5;
+    animation: shake 0.4s ease;
 }
 
-.page-header {
-    text-align: center;
-    padding: 20px;
-}
+@keyframes shake {
 
-.page-header h1 img {
-    width: 32px;
-    height: 32px;
-    vertical-align: middle;
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
 }
 
 .is-loading .post-item:not(.current-loading) {
     pointer-events: none;
+    opacity: 0.6;
 }
 
 .post-item.current-loading {
     opacity: 1;
+    box-shadow: 0 0 0 3px var(--primary-light), var(--shadow-lg);
+}
+
+.pagination-wrapper {
+    max-width: 680px;
+    margin: 16px auto 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 20px;
+    box-sizing: border-box;
 }
 
 .pagination {
@@ -96,53 +310,111 @@ body {
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 12px 0 24px;
+    gap: 8px;
+    padding: 16px 0;
 }
 
 .pagination .page-btn {
-    border: 1px solid #ddd;
-    background: #fff;
-    padding: 6px 10px;
-    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    padding: 10px 16px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     font-size: 14px;
-    color: #333;
+    font-weight: 500;
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+    min-width: 44px;
+    text-align: center;
 }
 
-.pagination .page-btn:hover {
-    background: #f5f5f5;
+.pagination .page-btn:hover:not([disabled]):not(.active) {
+    background: var(--bg-primary);
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.pagination .page-btn:active:not([disabled]) {
+    transform: translateY(0);
 }
 
 .pagination .page-btn.active {
-    background: #0a84ff;
+    background: var(--gradient-threads);
     color: white;
-    border-color: rgba(10, 132, 255, 0.6);
+    border-color: transparent;
+    font-weight: 600;
+    box-shadow: var(--shadow-md);
 }
 
 .pagination .page-btn[disabled] {
-    opacity: 0.5;
-    cursor: default;
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: var(--bg-tertiary);
 }
 
 .pagination .ellipsis {
-    padding: 6px 10px;
-    color: #666;
-}
-
-.pagination-wrapper {
-    max-width: 1200px;
-    margin: 6px auto 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 0 20px;
-    box-sizing: border-box;
+    padding: 10px 8px;
+    color: var(--text-muted);
+    font-weight: 500;
 }
 
 .page-info {
-    font-size: 14px;
-    color: #666;
+    font-size: 13px;
+    color: var(--text-secondary);
     margin-left: auto;
+    background: var(--bg-secondary);
+    padding: 8px 16px;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+    white-space: nowrap;
+}
+
+@media (max-width: 576px) {
+    .pagination-wrapper {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .pagination {
+        gap: 6px;
+    }
+
+    .pagination .page-btn {
+        padding: 8px 12px;
+        min-width: 38px;
+        font-size: 13px;
+    }
+
+    .page-info {
+        margin: 0 auto;
+    }
+
+    .post-item {
+        margin: 16px 0;
+        border-radius: var(--radius-md);
+    }
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+::selection {
+    background: var(--primary-light);
+    color: var(--primary);
 }

@@ -4,26 +4,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Threads 貼文</title>
+    <meta name="description" content="探索 Threads 精選貼文，發現精彩內容">
+    <meta name="theme-color" content="#833ab4">
+    <title>Threads 精選貼文</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="styles.css">
     <script src="console-filter.js"></script>
 </head>
 
 <body>
-    <div class="page-header">
-        <h1><img src="favicon.png" alt="Threads"> Threads 精選貼文</h1>
-        <p>探索精彩內容</p>
-    </div>
-    <div class="pagination-wrapper">
+    <header class="page-header">
+        <h1>
+            <img src="favicon.png" alt="Threads Logo" draggable="false">
+            <span>Threads 精選貼文</span>
+        </h1>
+        <p>✨ 探索精彩內容，發現有趣的人事物</p>
+    </header>
+    <nav class="pagination-wrapper" aria-label="頂部分頁導航">
+        <div class="page-info" aria-live="polite"></div>
+        <div class="pagination" role="navigation" aria-label="分頁"></div>
+    </nav>
+    <main id="posts-container" role="feed" aria-busy="false"></main>
+    <nav class="pagination-wrapper" aria-label="底部分頁導航">
         <div class="page-info" aria-hidden="true"></div>
-        <div class="pagination" aria-label="分頁"></div>
-    </div>
-    <div id="posts-container"></div>
-    <div class="pagination-wrapper">
-        <div class="page-info" aria-hidden="true"></div>
-        <div class="pagination" aria-label="分頁"></div>
-    </div>
+        <div class="pagination" role="navigation" aria-label="分頁"></div>
+    </nav>
     <script src="config.js"></script>
     <script src="threads-loader.js"></script>
 </body>
