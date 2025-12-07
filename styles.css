@@ -456,6 +456,15 @@ body {
         margin: 16px 0;
         border-radius: var(--radius-md);
     }
+    
+    .post-item iframe {
+        min-height: 500px !important;
+        max-height: none !important;
+    }
+    
+    .post-item blockquote.text-post-media {
+        min-height: 500px !important;
+    }
 }
 
 ::-webkit-scrollbar {
