@@ -203,7 +203,6 @@ body {
     margin: 0 auto !important;
     border: none !important;
     overflow: visible !important;
-    min-height: 200px !important;
     border-radius: var(--radius-lg) !important;
 }
 
@@ -212,12 +211,14 @@ body {
 .post-item blockquote.text-post-media section,
 .post-item blockquote.text-post-media article {
     max-width: 100% !important;
+    height: auto !important;
 }
 
 .post-item iframe {
     max-width: 100% !important;
     width: 100% !important;
-    min-height: 200px !important;
+    height: auto !important;
+    min-height: 400px !important;
     display: block !important;
     border-radius: var(--radius-lg);
 }
@@ -225,7 +226,6 @@ body {
 .post-item a {
     display: block;
     max-width: 100%;
-    overflow: hidden;
 }
 
 @-webkit-keyframes shimmer {
