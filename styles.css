@@ -384,13 +384,21 @@ body {
     background: var(--bg-primary);
     border-color: var(--primary);
     color: var(--primary);
-    -webkit-transform: translateY(-1px);
-    transform: translateY(-1px);
+    translate: 0 -1px;
 }
 
 .pagination .page-btn:active:not([disabled]) {
-    -webkit-transform: translateY(0);
-    transform: translateY(0);
+    translate: 0 0;
+}
+
+@supports not (translate: 0 -1px) {
+    .pagination .page-btn:hover:not([disabled]):not(.active) {
+        transform: translateY(-1px);
+    }
+
+    .pagination .page-btn:active:not([disabled]) {
+        transform: translateY(0);
+    }
 }
 
 .pagination .page-btn.active {
