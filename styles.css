@@ -94,7 +94,6 @@ body {
     max-width: 680px;
     margin: 0 auto;
     padding: 24px 20px;
-    box-sizing: border-box;
     min-height: 100vh;
     overflow-x: hidden;
 }
@@ -126,16 +125,24 @@ body {
     overflow: hidden;
     background: var(--bg-secondary);
     box-shadow: var(--shadow-md);
-    -webkit-transition: -webkit-transform var(--transition-normal), box-shadow var(--transition-normal);
-    transition: transform var(--transition-normal), box-shadow var(--transition-normal);
-    -webkit-animation: fadeInUp 0.5s ease backwards;
-    animation: fadeInUp 0.5s ease backwards;
+    transition: translate var(--transition-normal), box-shadow var(--transition-normal);
+    -webkit-animation: fadeInUp 0.5s ease 0s 1 normal backwards;
+    animation: fadeInUp 0.5s ease 0s 1 normal backwards;
 }
 
 .post-item:hover {
-    -webkit-transform: translateY(-2px);
-    transform: translateY(-2px);
+    translate: 0 -2px;
     box-shadow: var(--shadow-lg);
+}
+
+@supports not (translate: 0 -2px) {
+    .post-item {
+        transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+    }
+
+    .post-item:hover {
+        transform: translateY(-2px);
+    }
 }
 
 @-webkit-keyframes fadeInUp {
@@ -167,29 +174,33 @@ body {
 }
 
 .post-item:nth-child(1) {
+    -webkit-animation-delay: 0.05s;
     animation-delay: 0.05s;
 }
 
 .post-item:nth-child(2) {
+    -webkit-animation-delay: 0.1s;
     animation-delay: 0.1s;
 }
 
 .post-item:nth-child(3) {
+    -webkit-animation-delay: 0.15s;
     animation-delay: 0.15s;
 }
 
 .post-item:nth-child(4) {
+    -webkit-animation-delay: 0.2s;
     animation-delay: 0.2s;
 }
 
 .post-item:nth-child(5) {
+    -webkit-animation-delay: 0.25s;
     animation-delay: 0.25s;
 }
 
 .post-item blockquote.text-post-media {
-    box-sizing: border-box !important;
     max-width: 540px !important;
-    width: 540px !important;
+    width: 100% !important;
     margin: 0 auto !important;
     border: none !important;
     overflow: hidden !important;
@@ -200,13 +211,11 @@ body {
 .post-item blockquote.text-post-media section,
 .post-item blockquote.text-post-media article {
     max-width: 100% !important;
-    box-sizing: border-box !important;
 }
 
 .post-item iframe {
     max-width: 100% !important;
     width: 100% !important;
-    box-sizing: border-box !important;
     display: block !important;
 }
 
@@ -216,6 +225,16 @@ body {
     overflow: hidden;
 }
 
+@-webkit-keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
 @keyframes shimmer {
     0% {
         background-position: -200% 0;
@@ -223,6 +242,18 @@ body {
 
     100% {
         background-position: 200% 0;
+    }
+}
+
+@-webkit-keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
     }
 }
 
@@ -246,6 +277,7 @@ body {
             var(--bg-secondary) 50%,
             var(--bg-primary) 75%);
     background-size: 200% 100%;
+    -webkit-animation: shimmer 2s infinite;
     animation: shimmer 2s infinite;
     border-radius: var(--radius-md);
     display: flex;
@@ -257,21 +289,44 @@ body {
 .post-item.error {
     border: 2px solid var(--error);
     background: #fff5f5;
+    -webkit-animation: shake 0.4s ease;
     animation: shake 0.4s ease;
+}
+
+@-webkit-keyframes shake {
+
+    0%,
+    100% {
+        -webkit-transform: translateX(0);
+        transform: translateX(0);
+    }
+
+    25% {
+        -webkit-transform: translateX(-5px);
+        transform: translateX(-5px);
+    }
+
+    75% {
+        -webkit-transform: translateX(5px);
+        transform: translateX(5px);
+    }
 }
 
 @keyframes shake {
 
     0%,
     100% {
+        -webkit-transform: translateX(0);
         transform: translateX(0);
     }
 
     25% {
+        -webkit-transform: translateX(-5px);
         transform: translateX(-5px);
     }
 
     75% {
+        -webkit-transform: translateX(5px);
         transform: translateX(5px);
     }
 }
@@ -293,7 +348,6 @@ body {
     justify-content: space-between;
     gap: 16px;
     padding: 0 20px;
-    box-sizing: border-box;
 }
 
 .pagination {
@@ -467,31 +521,29 @@ body {
     }
 }
 
-.post-item,
 .post-item>a,
 .post-item blockquote {
-    contain: layout style;
+    contain: layout;
 }
 
 .post-item iframe[src*="threads.com"] {
-    max-width: 100% !important;
-    width: 100% !important;
+    max-width: 100%;
+    width: 100%;
 }
 
 .text-post-media-container,
 [class*="threads"],
 [class*="embed"] {
-    max-width: 100% !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
+    max-width: 100%;
+    width: 100%;
 }
 
 .post-item * {
-    min-width: 0 !important;
+    min-width: 0;
 }
 
 .post-item img,
 .post-item video {
-    max-width: 100% !important;
-    height: auto !important;
+    max-width: 100%;
+    height: auto;
 }
