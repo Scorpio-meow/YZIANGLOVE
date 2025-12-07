@@ -122,7 +122,6 @@ body {
     max-width: 540px;
     margin: 20px auto;
     border-radius: var(--radius-lg);
-    overflow: hidden;
     background: var(--bg-secondary);
     box-shadow: var(--shadow-md);
     transition: translate var(--transition-normal), box-shadow var(--transition-normal);
@@ -203,7 +202,9 @@ body {
     width: 100% !important;
     margin: 0 auto !important;
     border: none !important;
-    overflow: hidden !important;
+    overflow: visible !important;
+    min-height: 200px !important;
+    border-radius: var(--radius-lg) !important;
 }
 
 .post-item blockquote.text-post-media *,
@@ -216,7 +217,9 @@ body {
 .post-item iframe {
     max-width: 100% !important;
     width: 100% !important;
+    min-height: 200px !important;
     display: block !important;
+    border-radius: var(--radius-lg);
 }
 
 .post-item a {
