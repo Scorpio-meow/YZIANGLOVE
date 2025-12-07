@@ -14,18 +14,13 @@
     var rateLimitDetected = false;
     var consecutiveErrors = 0;
     var lastRequestTime = 0;
-    var visibleQueue = [];
     var retryQueue = [];
     var retryQueueTimer = null;
-    var observer = null;
-    var lazyLoadEnabled = true;
-    var MAX_VISIBLE_QUEUE = (typeof MAX_VISIBLE_QUEUE !== 'undefined' ? MAX_VISIBLE_QUEUE : Math.max(5, (typeof BATCH_SIZE !== 'undefined' ? Math.min(BATCH_SIZE * 10, 30) : 10)));
     var loadedCount = 0;
     var pageSize = (typeof PAGE_SIZE !== 'undefined' ? PAGE_SIZE : 50);
     var currentPage = 1;
     var totalPages = 1;
     var pageInfoEl = null;
-
     function readUrlState() {
         try {
             var params = new URLSearchParams(window.location.search);
@@ -115,17 +110,18 @@
         console.warn('[警告] 偵測到速率限制 (' + source + '),暫停載入 ' + (backoffTime / 1000) + ' 秒');
         showRateLimitBanner(backoffTime);
         console.warn('[警告] 調整延遲時間為 ' + (currentDelay / 1000) + ' 秒');
-        requestAnimationFrame(function () {
-            rateLimitDetected = false;
-            paused = false;
-            if (consecutiveErrors > 3) {
-                currentDelay = MAX_DELAY;
-            } else {
-                currentDelay = Math.max(LOAD_DELAY, currentDelay / 1.5);
-            }
-            console.log('[恢復] 速率限制解除,恢復載入,延遲: ' + (currentDelay / 1000) + ' 秒');
-            processSingleEmbed();
-            hideRateLimitBanner();
+        setTimeout(function () {
+            requestAnimationFrame(function () {
+                rateLimitDetected = false;
+                paused = false;
+                if (consecutiveErrors > 3) {
+                    currentDelay = MAX_DELAY;
+                } else {
+                    currentDelay = Math.max(LOAD_DELAY, currentDelay / 1.5);
+                }
+                console.log('[恢復] 速率限制解除,恢復載入,延遲: ' + (currentDelay / 1000) + ' 秒');
+                hideRateLimitBanner();
+            });
         }, backoffTime);
     }
     window.addEventListener('threads:rate-limit', function (e) {
@@ -274,235 +270,10 @@
         }
         attemptLoad();
     }
-    function setupIntersectionObserver() {
-        if (!('IntersectionObserver' in window)) {
-            console.warn('[警告] 瀏覽器不支援 IntersectionObserver，改用傳統載入方式');
-            lazyLoadEnabled = false;
-            return null;
-        }
-        var options = {
-            root: null,
-            rootMargin: '100px 0px',
-            threshold: 0.01
-        };
-        observer = new IntersectionObserver(function (entries) {
-            entries.forEach(function (entry) {
-                var postItem = entry.target;
-                var blockquote = postItem.querySelector('blockquote.text-post-media');
-                if (!blockquote) return;
-                if (entry.isIntersecting) {
-                    if (blockquote.dataset.embedLoaded !== 'true' &&
-                        blockquote.dataset.embedLoading !== 'true' &&
-                        blockquote.dataset.inQueue !== 'true' &&
-                        !blockquote.dataset.embedFailed) {
-                        if (rateLimitDetected) {
-                            console.warn('[Lazy] 已偵測速率限制，跳過加入佇列');
-                            return;
-                        }
-                        blockquote.dataset.inQueue = 'true';
-                        if (visibleQueue.length >= MAX_VISIBLE_QUEUE) {
-                            console.log('[Lazy] 佇列已滿，略過加入 (長度: ' + visibleQueue.length + ')');
-                        } else {
-                            visibleQueue.push(blockquote);
-                        }
-                        console.log('[Lazy] 貼文進入視窗，加入佇列 (佇列長度: ' + visibleQueue.length + ')');
-                        if (!processing && !paused && !rateLimitDetected) {
-                            processVisibleQueue();
-                        }
-                    }
-                }
-            });
-        }, options);
-        return observer;
-    }
-    function processVisibleQueue() {
-        if (processing || paused || rateLimitDetected) {
-            return;
-        }
-        while (visibleQueue.length > 0) {
-            var blockquote = visibleQueue[0];
-            if (blockquote.dataset.embedFailed ||
-                blockquote.dataset.embedLoaded === 'true' ||
-                blockquote.dataset.embedLoading === 'true') {
-                visibleQueue.shift();
-                continue;
-            }
-            break;
-        }
-        if (visibleQueue.length === 0) {
-            console.log('[Lazy] 佇列已清空');
-            return;
-        }
-        var now = Date.now();
-        var timeSinceLastRequest = now - lastRequestTime;
-        var minDelay = typeof MIN_DELAY_BETWEEN_REQUESTS !== 'undefined' ? MIN_DELAY_BETWEEN_REQUESTS : 2000;
-        if (lastRequestTime > 0 && timeSinceLastRequest < minDelay) {
-            setTimeout(processVisibleQueue, withJitter(minDelay - timeSinceLastRequest));
-            return;
-        }
-        var blockquote = visibleQueue.shift();
-        if (retryQueue.length > 0) console.log('[Retry] 重試佇列等待項目: ' + retryQueue.length);
-        processBlockquote(blockquote);
-    }
-
-    function processBlockquote(blockquote) {
-        processing = true;
-        lastRequestTime = Date.now();
-        var indicator = addLoadingIndicator(blockquote);
-        stats.total++;
-        var itemStartTime = Date.now();
-        var processStart = performance.now();
-        console.log('[載入] 載入中 (' + (loadedCount + 1) + '/' + allBlockquotes.length + ') - 延遲: ' + (currentDelay / 1000) + '秒');
-        blockquote.dataset.embedLoading = 'true';
-        var container = document.getElementById('posts-container');
-        var postItem = blockquote.closest('.post-item');
-
-        requestAnimationFrame(function () {
-            if (container) container.classList.add('is-loading');
-            if (postItem) postItem.classList.add('current-loading');
-        });
-        scheduleIdle(function () {
-            try {
-                if (rateLimitDetected) {
-                    console.warn('[警告] 已偵測速率限制，將略過 threadsEmbed.process() 呼叫');
-                    return;
-                }
-                if (window.threadsEmbed && typeof window.threadsEmbed.process === 'function') {
-                    window.threadsEmbed.process();
-                }
-            } catch (e) {
-                console.error('[錯誤] threadsEmbed.process 錯誤:', e);
-            }
-        });
-
-        function restoreState() {
-            requestAnimationFrame(function () {
-                var container = document.getElementById('posts-container');
-                if (container) container.classList.remove('is-loading');
-                var postItem = blockquote.closest('.post-item');
-                if (postItem) postItem.classList.remove('current-loading');
-            });
-        }
-
-        waitForIframeLoad(blockquote, IFRAME_TIMEOUT)
-            .then(function (success) {
-                var loadTime = (Date.now() - itemStartTime) / 1000;
-                stats.loadTimes.push(loadTime);
-
-                blockquote.dataset.embedLoading = 'false';
-                blockquote.dataset.embedLoaded = 'true';
-                blockquote.dataset.inQueue = 'false';
-
-                restoreState();
-
-                if (success) {
-                    stats.loaded++;
-                    loadedCount++;
-                    consecutiveErrors = Math.max(0, consecutiveErrors - 1);
-
-                    if (consecutiveErrors === 0 && currentDelay > LOAD_DELAY) {
-                        currentDelay = Math.max(LOAD_DELAY, currentDelay * 0.9);
-                    }
-
-                    console.log('[成功] 載入成功 #' + stats.loaded + ' (耗時: ' + loadTime.toFixed(2) + '秒)');
-                    if (observer && postItem) {
-                        observer.unobserve(postItem);
-                    }
-                } else {
-                    stats.failed++;
-
-                    if (consecutiveErrors >= 2) {
-                        currentDelay = Math.min(currentDelay * 1.3, MAX_DELAY);
-                        console.warn('[警告] 連續超時，延遲增加到 ' + (currentDelay / 1000).toFixed(1) + ' 秒');
-                    }
-
-                    console.warn('[警告] 載入超時');
-
-                    var retry = incrementRetry(blockquote);
-                    if (retry >= MAX_RETRIES) {
-                        markBlockquoteFailed(blockquote, 'max-retries', true);
-                        if (observer && postItem) {
-                            observer.unobserve(postItem);
-                        }
-                    } else {
-                        console.log('[重試] 將在延遲後重試載入 (重試次數: ' + retry + '/' + MAX_RETRIES + ')');
-                        blockquote.dataset.embedLoading = 'false';
-                        blockquote.dataset.embedLoaded = 'false';
-                        blockquote.dataset.inQueue = 'false';
-                        enqueueRetry(blockquote, withJitter(currentDelay));
-                    }
-                }
-
-                removeLoadingIndicator(indicator);
-                processing = false;
-
-                var processElapsed = performance.now() - processStart;
-                if (processElapsed > 150) {
-                    console.warn('[性能] processBlockquote took ' + processElapsed.toFixed(1) + 'ms');
-                }
-
-                if (visibleQueue.length > 0) {
-                    processRetryQueue();
-                    setTimeout(processVisibleQueue, withJitter(currentDelay));
-                } else {
-
-                    if (stats.total > 0 && stats.loaded + stats.failed === stats.total) {
-                        logStats();
-                    }
-                }
-            })
-            .catch(function (error) {
-                console.error('[錯誤] 處理錯誤:', error);
-
-                blockquote.dataset.embedLoading = 'false';
-                blockquote.dataset.inQueue = 'false';
-                stats.failed++;
-
-                restoreState();
-
-                var postItem = blockquote.closest('.post-item');
-                if (postItem) {
-                    var retry = incrementRetry(blockquote);
-                    if (retry >= MAX_RETRIES) {
-                        markBlockquoteFailed(blockquote, 'exception', true);
-                    } else {
-                        console.log('[重試] 處理發生錯誤, 將重試 (重試次數: ' + retry + '/' + MAX_RETRIES + ')');
-                        blockquote.dataset.inQueue = 'false';
-                        enqueueRetry(blockquote, withJitter(currentDelay));
-                    }
-                }
-
-                removeLoadingIndicator(indicator);
-                processing = false;
-
-
-                if (visibleQueue.length > 0) {
-                    setTimeout(processVisibleQueue, withJitter(currentDelay));
-                }
-            });
-    }
     function addLoadingIndicator(blockquote) {
-        var indicator = document.createElement('div');
-        indicator.className = 'threads-loading';
-        indicator.textContent = '載入 Threads 貼文中...';
-        var parent = blockquote.parentNode;
-        if (parent) {
-            requestAnimationFrame(function () {
-                if (parent && blockquote.parentNode === parent) {
-                    parent.insertBefore(indicator, blockquote);
-                }
-            });
-        }
-        return indicator;
+        return null;
     }
     function removeLoadingIndicator(indicator) {
-        if (indicator && indicator.parentNode) {
-            requestAnimationFrame(function () {
-                if (indicator && indicator.parentNode) {
-                    indicator.parentNode.removeChild(indicator);
-                }
-            });
-        }
     }
     function markBlockquoteFailed(blockquote, reason, hide) {
         try {
@@ -522,14 +293,6 @@
                         if (hide) postItem.style.display = 'none';
                     }
                 });
-                if (observer) {
-                    try { observer.unobserve(postItem); } catch (e) { }
-                }
-                try {
-                    for (var qi = visibleQueue.length - 1; qi >= 0; qi--) {
-                        if (visibleQueue[qi] === blockquote) visibleQueue.splice(qi, 1);
-                    }
-                } catch (e) { }
             }
         } catch (e) { }
     }
@@ -543,7 +306,7 @@
             if (!banner) {
                 banner = document.createElement('div');
                 banner.id = 'threads-rate-limit-warning';
-                banner.className = 'threads-loading';
+                banner.className = 'threads-rate-limit';
                 banner.style.margin = '8px 0';
                 container.insertBefore(banner, container.firstChild);
             }
@@ -575,7 +338,6 @@
             return r;
         } catch (e) { return 1; }
     }
-
     function enqueueRetry(blockquote, backoffMs) {
         try {
             if (!blockquote || blockquote.dataset.embedFailed) return;
@@ -589,9 +351,9 @@
             }
         } catch (e) { }
     }
-
     function processRetryQueue() {
         try {
+            if (processing || paused || rateLimitDetected) return;
             var now = Date.now();
             for (var i = retryQueue.length - 1; i >= 0; i--) {
                 var item = retryQueue[i];
@@ -603,28 +365,105 @@
                         retryQueue.splice(i, 1);
                         continue;
                     }
-                    try {
-                        if (lazyLoadEnabled && observer) {
-                            visibleQueue.push(bq);
-                            console.log('[Retry] 回補至 visibleQueue, 佇列長度:', visibleQueue.length);
-                        } else {
-                            var idx = allBlockquotes.indexOf(bq);
-                            if (idx >= 0) allBlockquotes.splice(idx, 1);
-                            allBlockquotes.push(bq);
-                            console.log('[Retry] 非 Lazy 模式: 已回補至 allBlockquotes 末端 (長度: ' + allBlockquotes.length + ')');
-                        }
-                    } catch (e) { }
                     retryQueue.splice(i, 1);
+                    console.log('[Retry] 正在重試載入 (佇列剩餘: ' + retryQueue.length + ')');
+                    processBlockquoteRetry(bq);
+                    break;
                 }
             }
             if (retryQueue.length === 0 && retryQueueTimer) {
                 clearInterval(retryQueueTimer);
                 retryQueueTimer = null;
             }
-            if (!processing && !paused && !rateLimitDetected && visibleQueue.length > 0) {
-                processVisibleQueue();
-            }
         } catch (e) { }
+    }
+    function processBlockquoteRetry(blockquote) {
+        if (!blockquote || processing || paused || rateLimitDetected) return;
+        processing = true;
+        lastRequestTime = Date.now();
+        var indicator = addLoadingIndicator(blockquote);
+        stats.total++;
+        var itemStartTime = Date.now();
+        var processStart = performance.now();
+        var retryCount = parseInt(blockquote.dataset.retryCount || '0', 10);
+        console.log('[重試載入] 重試中 (第 ' + retryCount + '/' + MAX_RETRIES + ' 次)');
+        blockquote.dataset.embedLoading = 'true';
+        var container = document.getElementById('posts-container');
+        var postItem = blockquote.closest('.post-item');
+        requestAnimationFrame(function () {
+            if (container) container.classList.add('is-loading');
+            if (postItem) postItem.classList.add('current-loading');
+        });
+        scheduleIdle(function () {
+            try {
+                if (window.threadsEmbed && typeof window.threadsEmbed.process === 'function') {
+                    window.threadsEmbed.process();
+                }
+            } catch (e) {
+                console.warn('[Embed] process() failed:', e);
+            }
+        });
+        function restoreState() {
+            requestAnimationFrame(function () {
+                if (container) container.classList.remove('is-loading');
+                if (postItem) postItem.classList.remove('current-loading');
+            });
+        }
+        waitForIframeLoad(blockquote, IFRAME_TIMEOUT)
+            .then(function (success) {
+                var loadTime = (Date.now() - itemStartTime) / 1000;
+                stats.loadTimes.push(loadTime);
+                blockquote.dataset.embedLoading = 'false';
+                blockquote.dataset.embedLoaded = 'true';
+                blockquote.dataset.inQueue = 'false';
+                restoreState();
+                if (success) {
+                    stats.loaded++;
+                    loadedCount++;
+                    consecutiveErrors = Math.max(0, consecutiveErrors - 1);
+                    if (consecutiveErrors === 0 && currentDelay > LOAD_DELAY) {
+                        currentDelay = Math.max(LOAD_DELAY, currentDelay / 1.2);
+                    }
+                    console.log('[重試成功] 重試載入成功 (耗時: ' + loadTime.toFixed(2) + '秒)');
+                } else {
+                    stats.failed++;
+                    var retry = incrementRetry(blockquote);
+                    if (retry >= MAX_RETRIES) {
+                        markBlockquoteFailed(blockquote, 'max-retries', true);
+                    } else {
+                        console.log('[重試失敗] 將再次重試 (重試次數: ' + retry + '/' + MAX_RETRIES + ')');
+                        blockquote.dataset.embedLoading = 'false';
+                        blockquote.dataset.embedLoaded = 'false';
+                        blockquote.dataset.inQueue = 'false';
+                        enqueueRetry(blockquote, withJitter(currentDelay));
+                    }
+                }
+                removeLoadingIndicator(indicator);
+                processing = false;
+                if (currentIndex < allBlockquotes.length) {
+                    setTimeout(withJitter(currentDelay));
+                } else if (retryQueue.length > 0) {
+                    setTimeout(processRetryQueue, 1000);
+                } else {
+                    logStats();
+                }
+            })
+            .catch(function (error) {
+                console.error('[重試錯誤] 處理錯誤:', error);
+                blockquote.dataset.embedLoading = 'false';
+                stats.failed++;
+                restoreState();
+                markBlockquoteFailed(blockquote, 'error', true);
+                removeLoadingIndicator(indicator);
+                processing = false;
+                if (currentIndex < allBlockquotes.length) {
+                    setTimeout(withJitter(currentDelay));
+                } else if (retryQueue.length > 0) {
+                    setTimeout(processRetryQueue, 1000);
+                } else {
+                    logStats();
+                }
+            });
     }
     function scheduleIdle(fn) {
         if (window.requestIdleCallback) {
@@ -659,13 +498,14 @@
                 earlyTimeoutId = setTimeout(function () {
                     try {
                         var parentNode = blockquote.parentNode;
-                        if (!parentNode) { done(false); return; }
+                        if (!parentNode) { return; }
                         if (parentNode.querySelector('iframe')) return;
                         if (rateLimitDetected || !document.body.contains(blockquote) || blockquote.dataset.embedFailed || blockquote.dataset.retryQueued === 'true') {
-                            console.warn('[早退] 早期超時或其他條件觸發，提前放棄等待 iframe');
-                            done(false);
+                            console.warn('[早退] 早期超時或其他條件觸發，暫時放棄等待 iframe (尚未標記為失敗)');
+                        } else {
+                            console.warn('[早期警告] 尚未發現 iframe，繼續等待直到主超時 (' + (timeout || IFRAME_TIMEOUT) + 'ms)');
                         }
-                    } catch (e) { done(false); }
+                    } catch (e) { }
                 }, minTout);
             } catch (e) { }
             if (!('MutationObserver' in window)) {
@@ -684,20 +524,35 @@
                 }
             } catch (e) { }
             observer = new MutationObserver(function (mutations) {
+                var blockquoteRemoved = false;
                 for (var i = 0; i < mutations.length; i++) {
                     var mutation = mutations[i];
                     if (mutation.removedNodes && mutation.removedNodes.length) {
                         for (var r = 0; r < mutation.removedNodes.length; r++) {
                             var rn = mutation.removedNodes[r];
                             if (rn === blockquote || (rn && rn.contains && rn.contains(blockquote))) {
-                                done(false);
-                                return;
+                                blockquoteRemoved = true;
                             }
                         }
                     }
                     for (var j = 0; j < mutation.addedNodes.length; j++) {
                         var node = mutation.addedNodes[j];
+                        function checkNodeForIframes(n) {
+                            try {
+                                if (!n) return;
+                                if (n.tagName === 'IFRAME') {
+                                    node = n;
+                                } else if (n.querySelector) {
+                                    var nested = n.querySelectorAll('iframe');
+                                    if (nested && nested.length) {
+                                        node = nested[0];
+                                    }
+                                }
+                            } catch (e) { }
+                        }
+                        checkNodeForIframes(node);
                         if (node.tagName === 'IFRAME') {
+                            console.log('[observer] 偵測到新增 IFRAME，視為 embed 目標');
                             (function (iframeNode) {
                                 var handled = false;
                                 function markDone(success, reason) {
@@ -751,6 +606,38 @@
                         }
                     }
                 }
+                if (blockquoteRemoved) {
+                    setTimeout(function () {
+                        try {
+                            var parentNode = blockquote.parentNode || document.querySelector('[data-posts-container]') || document.body;
+                            if (parentNode) {
+                                var found = parentNode.querySelector('iframe');
+                                if (found) {
+                                    console.log('[observer] 在 blockquote 移除後找到 iframe，視為替換成功');
+                                    var src = found.getAttribute('src') || found.src || '';
+                                    if (/chrome-error:|chromewebdata/i.test(src)) {
+                                        markBlockquoteFailed(blockquote, 'xframe-deny', true);
+                                        done(false);
+                                        return;
+                                    }
+                                    var handled = false;
+                                    function markDone(success, reason) {
+                                        if (handled) return;
+                                        handled = true;
+                                        if (!success) markBlockquoteFailed(blockquote, reason || 'iframe-error', true);
+                                        done(success);
+                                    }
+                                    found.addEventListener('error', function () {
+                                        console.warn('[iframe] load error: src=' + (found.src || found.getAttribute('src')));
+                                        try { if (isHostAllowed(found.getAttribute('src') || found.src || '', ALLOWED_THREADS_HOSTS)) handleRateLimit('iframe-error'); } catch (e) { }
+                                        markDone(false, 'iframe-error');
+                                    }, { once: true });
+                                    found.addEventListener('load', function () { markDone(true); }, { once: true });
+                                }
+                            }
+                        } catch (e) { }
+                    }, 200);
+                }
             });
             observer.observe(parentNode, {
                 childList: true,
@@ -771,142 +658,6 @@
                 }
             }
         });
-    }
-    function processSingleEmbed() {
-        if (processing || paused || rateLimitDetected) {
-            return;
-        }
-        if (currentIndex >= allBlockquotes.length) {
-            if (stats.total > 0) {
-                logStats();
-            }
-            return;
-        }
-        var now = Date.now();
-        var timeSinceLastRequest = now - lastRequestTime;
-        var minDelay = typeof MIN_DELAY_BETWEEN_REQUESTS !== 'undefined' ? MIN_DELAY_BETWEEN_REQUESTS : 2000;
-        if (lastRequestTime > 0 && timeSinceLastRequest < minDelay) {
-            setTimeout(processSingleEmbed, withJitter(minDelay - timeSinceLastRequest));
-            return;
-        }
-        var blockquote = allBlockquotes[currentIndex];
-        if (blockquote.dataset.embedLoaded === 'true') {
-            currentIndex++;
-            processSingleEmbed();
-            return;
-        }
-        processing = true;
-        lastRequestTime = Date.now();
-        var indicator = addLoadingIndicator(blockquote);
-        stats.total++;
-        var itemStartTime = Date.now();
-        var processStart = performance.now();
-        console.log('[載入] 載入中 (' + (loadedCount + 1) + '/' + allBlockquotes.length + ') - 延遲: ' + (currentDelay / 1000) + '秒');
-        blockquote.dataset.embedLoading = 'true';
-        var hiddenBlockquotes = [];
-        var container = document.getElementById('posts-container');
-        var postItem = blockquote.closest('.post-item');
-        requestAnimationFrame(function () {
-            if (container) container.classList.add('is-loading');
-            if (postItem) postItem.classList.add('current-loading');
-        });
-
-        scheduleIdle(function () {
-            try {
-                if (rateLimitDetected) {
-                    console.warn('[警告] 已偵測速率限制，將略過 threadsEmbed.process() 呼叫');
-                    return;
-                }
-                if (window.threadsEmbed && typeof window.threadsEmbed.process === 'function') {
-                    window.threadsEmbed.process();
-                }
-            } catch (e) {
-                console.error('[錯誤] threadsEmbed.process 錯誤:', e);
-            }
-        });
-        function restoreHiddenBlockquotes() {
-            requestAnimationFrame(function () {
-                var container = document.getElementById('posts-container');
-                if (container) container.classList.remove('is-loading');
-                var postItem = blockquote.closest('.post-item');
-                if (postItem) postItem.classList.remove('current-loading');
-            });
-        }
-        waitForIframeLoad(blockquote, IFRAME_TIMEOUT)
-            .then(function (success) {
-                var loadTime = (Date.now() - itemStartTime) / 1000;
-                stats.loadTimes.push(loadTime);
-                blockquote.dataset.embedLoading = 'false';
-                blockquote.dataset.embedLoaded = 'true';
-                restoreHiddenBlockquotes();
-                if (success) {
-                    stats.loaded++;
-                    loadedCount++;
-                    consecutiveErrors = Math.max(0, consecutiveErrors - 1);
-                    if (consecutiveErrors === 0 && currentDelay > LOAD_DELAY) {
-                        currentDelay = Math.max(LOAD_DELAY, currentDelay * 0.9);
-                    }
-                    console.log('[成功] 載入成功 #' + stats.loaded + ' (耗時: ' + loadTime.toFixed(2) + '秒)');
-                } else {
-                    stats.failed++;
-                    if (consecutiveErrors >= 2) {
-                        currentDelay = Math.min(currentDelay * 1.3, MAX_DELAY);
-                        console.warn('[警告] 連續超時，延遲增加到 ' + (currentDelay / 1000).toFixed(1) + ' 秒');
-                    }
-                    console.warn('[警告] 載入超時 #' + (currentIndex + 1));
-                    var retry = incrementRetry(blockquote);
-                    if (retry >= MAX_RETRIES) {
-                        markBlockquoteFailed(blockquote, 'max-retries', true);
-                    } else {
-                        console.log('[重試] 將在延遲後重試載入 (重試次數: ' + retry + '/' + MAX_RETRIES + ')');
-                        blockquote.dataset.embedLoading = 'false';
-                        blockquote.dataset.embedLoaded = 'false';
-                        blockquote.dataset.inQueue = 'false';
-                        enqueueRetry(blockquote, withJitter(currentDelay));
-                    }
-                }
-                removeLoadingIndicator(indicator);
-                processing = false;
-                var processElapsed = performance.now() - processStart;
-                if (processElapsed > 150) console.warn('[性能] processSingleEmbed total took ' + processElapsed.toFixed(1) + 'ms');
-                currentIndex++;
-                if (currentIndex < allBlockquotes.length) {
-                    processRetryQueue();
-                    setTimeout(processSingleEmbed, withJitter(currentDelay));
-                } else {
-                    logStats();
-                }
-            })
-            .catch(function (error) {
-                console.error('[錯誤] 處理錯誤:', error);
-                blockquote.dataset.embedLoading = 'false';
-                stats.failed++;
-
-                restoreHiddenBlockquotes();
-
-                var postItem = blockquote.closest('.post-item');
-                if (postItem) {
-                    var retry = incrementRetry(blockquote);
-                    if (retry >= MAX_RETRIES) {
-                        markBlockquoteFailed(blockquote, 'exception', true);
-                    } else {
-                        console.log('[重試] 處理發生錯誤, 將重試 (重試次數: ' + retry + '/' + MAX_RETRIES + ')');
-                        blockquote.dataset.inQueue = 'false';
-                        enqueueRetry(blockquote, withJitter(currentDelay));
-                    }
-                }
-
-                removeLoadingIndicator(indicator);
-                processing = false;
-                var processElapsed = performance.now() - processStart;
-                if (processElapsed > 150) console.warn('[性能] processSingleEmbed total took ' + processElapsed.toFixed(1) + 'ms');
-                currentIndex++;
-                if (currentIndex < allBlockquotes.length) {
-                    setTimeout(processSingleEmbed, withJitter(currentDelay));
-                } else {
-                    logStats();
-                }
-            });
     }
     function init() {
         var container = document.getElementById('posts-container');
@@ -972,12 +723,10 @@
             rateLimitDetected = false;
             consecutiveErrors = 0;
             lastRequestTime = 0;
-            visibleQueue = [];
             retryQueue = [];
             if (retryQueueTimer) { clearInterval(retryQueueTimer); retryQueueTimer = null; }
             loadedCount = 0;
             stats = { total: 0, loaded: 0, failed: 0, rateLimitHits: 0, startTime: Date.now(), loadTimes: [] };
-            if (observer) { try { observer.disconnect(); } catch (e) { } observer = null; }
             try { hideRateLimitBanner(); } catch (e) { }
         }
         function updatePaginationControls() {
@@ -994,7 +743,6 @@
                     window.location.search = '?page=' + pageNum + '&page_size=' + (typeof size !== 'undefined' ? size : pageSize);
                 }
             }
-
             function addBtnTo(parentEl, label, page, disabled, active) {
                 var btn = document.createElement('button');
                 btn.className = 'page-btn' + (active ? ' active' : '');
@@ -1051,51 +799,12 @@
                     allBlockquotes = Array.prototype.slice.call(blockquotes);
                     try { loadedCount = container.querySelectorAll('blockquote[data-embed-loaded="true"]').length || 0; } catch (e) { loadedCount = 0; }
                     totalPages = Math.max(1, Math.ceil(posts.length / pageSize));
-                    if (lazyLoadEnabled) observer = setupIntersectionObserver();
-                    if (lazyLoadEnabled && observer) {
-                        var postItems = container.querySelectorAll('.post-item');
-                        postItems.forEach(function (item) { observer.observe(item); });
-                    }
                     currentIndex = 0;
                     updatePaginationControls();
                     try { updateUrlParams(push); } catch (e) { }
                     if (allBlockquotes.length > 0) {
                         loadEmbedScript(function () {
                             try { currentIndex = 0; } catch (e) { }
-                            processSingleEmbed();
-                            if (!lazyLoadEnabled || !observer) {
-                            } else {
-                                requestAnimationFrame(function () {
-                                    try {
-                                        var viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-                                        var postItems = container.querySelectorAll('.post-item');
-                                        var initialLoadCount = 0;
-                                        postItems.forEach(function (item) {
-                                            var rect = item.getBoundingClientRect();
-                                            if (rect.top < viewportHeight + 100 && rect.bottom > -100) {
-                                                var blockquote = item.querySelector('blockquote.text-post-media');
-                                                if (!blockquote) return;
-                                                if (blockquote.dataset.embedLoaded !== 'true' &&
-                                                    blockquote.dataset.embedLoading !== 'true' &&
-                                                    blockquote.dataset.inQueue !== 'true' &&
-                                                    !blockquote.dataset.embedFailed) {
-                                                    blockquote.dataset.inQueue = 'true';
-                                                    if (visibleQueue.length < MAX_VISIBLE_QUEUE) {
-                                                        visibleQueue.push(blockquote);
-                                                        initialLoadCount++;
-                                                    }
-                                                }
-                                            }
-                                        });
-                                        if (initialLoadCount > 0) {
-                                            console.log('[Init] 頁面載入時發現 ' + initialLoadCount + ' 個視窗內的貼文，加入佇列');
-                                        }
-                                        if (visibleQueue.length > 0 && !processing && !paused && !rateLimitDetected) {
-                                            processVisibleQueue();
-                                        }
-                                    } catch (e) { }
-                                });
-                            }
                         });
                     }
                 });

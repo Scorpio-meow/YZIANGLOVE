@@ -200,41 +200,6 @@ body {
     }
 }
 
-.threads-loading {
-    background: linear-gradient(90deg,
-            var(--bg-tertiary) 25%,
-            var(--bg-secondary) 50%,
-            var(--bg-tertiary) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: var(--radius-md);
-    min-height: 120px;
-    padding: 24px;
-    text-align: center;
-    color: var(--text-muted);
-    margin: 4px 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-}
-
-.threads-loading::before {
-    content: '';
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--text-muted);
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-right: 12px;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
 
 .post-item:not(:has(iframe)) blockquote.text-post-media {
     min-height: 180px;
@@ -249,17 +214,6 @@ body {
     align-items: center;
     justify-content: center;
     border: 2px dashed var(--border-color);
-}
-
-.post-item:not(:has(iframe)) blockquote.text-post-media::before {
-    content: '👇 捲動至此處載入貼文';
-    color: var(--text-secondary);
-    font-size: 14px;
-    font-weight: 500;
-    padding: 12px 20px;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-sm);
 }
 
 .post-item.error {
@@ -417,4 +371,13 @@ body {
 ::selection {
     background: var(--primary-light);
     color: var(--primary);
+}
+
+.threads-rate-limit {
+    background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+    font-weight: 500;
 }
