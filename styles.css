@@ -211,14 +211,11 @@ body {
 .post-item blockquote.text-post-media section,
 .post-item blockquote.text-post-media article {
     max-width: 100% !important;
-    height: auto !important;
 }
 
 .post-item iframe {
     max-width: 100% !important;
     width: 100% !important;
-    height: auto !important;
-    min-height: 400px !important;
     display: block !important;
     border-radius: var(--radius-lg);
 }
