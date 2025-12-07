@@ -96,6 +96,7 @@ body {
     padding: 24px 20px;
     box-sizing: border-box;
     min-height: 100vh;
+    overflow-x: hidden;
 }
 
 @media (max-width: 576px) {
@@ -119,29 +120,48 @@ body {
 .post-item {
     position: relative;
     display: block;
-    width: 100%;
-    margin: 20px 0;
+    max-width: 540px;
+    margin: 20px auto;
     border-radius: var(--radius-lg);
     overflow: hidden;
     background: var(--bg-secondary);
     box-shadow: var(--shadow-md);
+    -webkit-transition: -webkit-transform var(--transition-normal), box-shadow var(--transition-normal);
     transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+    -webkit-animation: fadeInUp 0.5s ease backwards;
     animation: fadeInUp 0.5s ease backwards;
 }
 
 .post-item:hover {
+    -webkit-transform: translateY(-2px);
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
 }
 
-@keyframes fadeInUp {
+@-webkit-keyframes fadeInUp {
     from {
         opacity: 0;
+        -webkit-transform: translateY(20px);
         transform: translateY(20px);
     }
 
     to {
         opacity: 1;
+        -webkit-transform: translateY(0);
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        -webkit-transform: translateY(20px);
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        -webkit-transform: translateY(0);
         transform: translateY(0);
     }
 }
@@ -167,15 +187,33 @@ body {
 }
 
 .post-item blockquote.text-post-media {
-    box-sizing: border-box;
+    box-sizing: border-box !important;
+    max-width: 540px !important;
+    width: 540px !important;
+    margin: 0 auto !important;
+    border: none !important;
+    overflow: hidden !important;
+}
+
+.post-item blockquote.text-post-media *,
+.post-item blockquote.text-post-media div,
+.post-item blockquote.text-post-media section,
+.post-item blockquote.text-post-media article {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.post-item iframe {
     max-width: 100% !important;
     width: 100% !important;
-    margin: 0 !important;
-    border: none !important;
+    box-sizing: border-box !important;
+    display: block !important;
 }
 
 .post-item a {
     display: block;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 @keyframes shimmer {
@@ -259,9 +297,16 @@ body {
 }
 
 .pagination {
+    display: -webkit-box;
+    display: -ms-flexbox;
     display: flex;
+    -ms-flex-wrap: wrap;
     flex-wrap: wrap;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
     align-items: center;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
     justify-content: center;
     gap: 8px;
     padding: 16px 0;
@@ -285,10 +330,12 @@ body {
     background: var(--bg-primary);
     border-color: var(--primary);
     color: var(--primary);
+    -webkit-transform: translateY(-1px);
     transform: translateY(-1px);
 }
 
 .pagination .page-btn:active:not([disabled]) {
+    -webkit-transform: translateY(0);
     transform: translateY(0);
 }
 
@@ -379,4 +426,72 @@ body {
     color: var(--text-primary);
     box-shadow: var(--shadow-sm);
     font-weight: 500;
+}
+
+@supports not (gap: 8px) {
+    .pagination {
+        margin: -4px;
+    }
+
+    .pagination .page-btn,
+    .pagination .ellipsis {
+        margin: 4px;
+    }
+}
+
+#posts-container,
+.post-item>*,
+.post-item blockquote,
+.post-item blockquote>*,
+.post-item iframe {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.page-header h1 {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+@supports not (gap: 12px) {
+    .page-header h1 img {
+        margin-right: 12px;
+    }
+}
+
+.post-item,
+.post-item>a,
+.post-item blockquote {
+    contain: layout style;
+}
+
+.post-item iframe[src*="threads.com"] {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.text-post-media-container,
+[class*="threads"],
+[class*="embed"] {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.post-item * {
+    min-width: 0 !important;
+}
+
+.post-item img,
+.post-item video {
+    max-width: 100% !important;
+    height: auto !important;
 }
