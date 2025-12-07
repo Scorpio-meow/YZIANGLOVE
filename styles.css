@@ -251,7 +251,6 @@ body {
 .pagination-wrapper {
     max-width: 680px;
     margin: 16px auto 24px;
-    display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;

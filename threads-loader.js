@@ -670,41 +670,32 @@
         function appendPostsInChunks(postsToAppend, done) {
             if (typeof postsToAppend === 'function') { done = postsToAppend; postsToAppend = posts; }
             if (!postsToAppend || postsToAppend.length === 0) return done();
-            if (postsToAppend.length <= CHUNK_APPEND_SIZE) {
-                var frag = document.createDocumentFragment();
-                for (var i = 0; i < postsToAppend.length; i++) {
-                    var item = document.createElement('div');
-                    item.className = 'post-item';
-                    item.innerHTML = postsToAppend[i];
-                    frag.appendChild(item);
-                }
-                container.appendChild(frag);
-                return done();
-            }
             var idx = 0;
-            function loop() {
-                var start = performance.now();
+            var batchSize = CHUNK_APPEND_SIZE;
+            function step(deadline) {
                 var frag = document.createDocumentFragment();
-                var end = Math.min(idx + CHUNK_APPEND_SIZE, postsToAppend.length);
-                for (; idx < end; idx++) {
+                var start = performance.now();
+                var count = 0;
+                while (idx < postsToAppend.length && count < batchSize) {
+                    if (deadline && typeof deadline.timeRemaining === 'function' && deadline.timeRemaining() < 8) break;
                     var item = document.createElement('div');
                     item.className = 'post-item';
-                    item.innerHTML = postsToAppend[idx];
+                    item.innerHTML = postsToAppend[idx++];
                     frag.appendChild(item);
+                    count++;
                 }
                 container.appendChild(frag);
                 var elapsed = performance.now() - start;
+                if (elapsed > 16 && batchSize > 5) {
+                    batchSize = Math.max(5, Math.floor(batchSize * 0.75));
+                }
                 if (idx < postsToAppend.length) {
-                    if (elapsed > 30) {
-                        scheduleIdle(loop);
-                    } else {
-                        setTimeout(loop, 0);
-                    }
+                    scheduleIdle(step);
                 } else {
                     done();
                 }
             }
-            loop();
+            scheduleIdle(step);
         }
         totalPages = Math.max(1, Math.ceil(posts.length / pageSize));
         function getPagePosts(page) {
